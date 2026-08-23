@@ -5,11 +5,15 @@
 This investigation examines the structure of the Adelaide Metro static GTFS dataset before implementing the static GTFS parser. The initial parser will focus on stops, routes and trips, while related GTFS files are also reviewed to understand how the data is connected.
 
 ## 2. Data Source
-Dataset version: 1692
-Retrieval date: 23 August 2026
-The static GTFS dataset was obtained from the official Adelaide Metro GTFS service provided by the client.
 
-The GTFS specification and supporting documentation are maintained by MobilityData through GTFS.org.
+- Dataset version: `1692`
+- Retrieval date: 23 August 2026
+- Adelaide Metro GTFS: https://gtfs.adelaidemetro.com.au/#/gtfsr
+- GTFS specification: https://gtfs.org/
+
+The static GTFS dataset was obtained from the official Adelaide Metro GTFS service recommended by the client.
+
+The client also recommended MobilityData/GTFS.org as the appropriate reference for the current GTFS specification.
 
 ## 3. Files Observed
 
