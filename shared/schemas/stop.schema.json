@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Stop",
+  "type": "object",
+  "required": [
+    "stop_id",
+    "stop_name",
+    "stop_lat",
+    "stop_lon"
+  ],
+  "properties": {
+    "stop_id": {
+      "type": "string"
+    },
+    "stop_name": {
+      "type": "string"
+    },
+    "stop_lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "stop_lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    }
+  },
+  "additionalProperties": true
+}

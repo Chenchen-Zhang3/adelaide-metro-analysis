@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Trip",
+  "type": "object",
+  "required": [
+    "trip_id",
+    "route_id",
+    "service_id"
+  ],
+  "properties": {
+    "trip_id": {
+      "type": "string"
+    },
+    "route_id": {
+      "type": "string"
+    },
+    "service_id": {
+      "type": "string"
+    },
+    "trip_headsign": {
+      "type": "string"
+    },
+    "direction_id": {
+      "type": ["integer", "null"]
+    }
+  },
+  "additionalProperties": true
+}

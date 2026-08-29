@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Processed GTFS Trip Update",
+  "type": "object",
+  "required": [
+    "trip_id",
+    "route_id",
+    "stop_id",
+    "delay_seconds"
+  ],
+  "properties": {
+    "trip_id": {
+      "type": "string"
+    },
+    "route_id": {
+      "type": "string"
+    },
+    "stop_id": {
+      "type": "string"
+    },
+    "scheduled_arrival": {
+      "type": ["string", "null"]
+    },
+    "actual_arrival": {
+      "type": ["string", "null"]
+    },
+    "delay_seconds": {
+      "type": "integer"
+    },
+    "timestamp": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": true
+}
