@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Route",
+  "type": "object",
+  "required": [
+    "route_id",
+    "route_type"
+  ],
+  "properties": {
+    "route_id": {
+      "type": "string"
+    },
+    "route_short_name": {
+      "type": "string"
+    },
+    "route_long_name": {
+      "type": "string"
+    },
+    "route_type": {
+      "type": "integer"
+    }
+  },
+  "additionalProperties": true
+}

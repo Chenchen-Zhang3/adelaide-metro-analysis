@@ -1,0 +1,16 @@
+[
+  {
+    "trip_id": "TRIP_001",
+    "route_id": "ROUTE_001",
+    "service_id": "WEEKDAY",
+    "trip_headsign": "Adelaide CBD",
+    "direction_id": 0
+  },
+  {
+    "trip_id": "TRIP_002",
+    "route_id": "ROUTE_002",
+    "service_id": "WEEKDAY",
+    "trip_headsign": "Entertainment Centre",
+    "direction_id": 1
+  }
+]

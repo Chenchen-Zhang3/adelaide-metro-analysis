@@ -1,0 +1,20 @@
+[
+  {
+    "trip_id": "TRIP_001",
+    "route_id": "ROUTE_001",
+    "stop_id": "STOP_001",
+    "scheduled_arrival": "2026-08-29T09:00:00+09:30",
+    "actual_arrival": "2026-08-29T09:06:00+09:30",
+    "delay_seconds": 360,
+    "timestamp": "2026-08-29T09:06:00+09:30"
+  },
+  {
+    "trip_id": "TRIP_002",
+    "route_id": "ROUTE_002",
+    "stop_id": "STOP_002",
+    "scheduled_arrival": "2026-08-29T10:00:00+09:30",
+    "actual_arrival": "2026-08-29T10:02:00+09:30",
+    "delay_seconds": 120,
+    "timestamp": "2026-08-29T10:02:00+09:30"
+  }
+]

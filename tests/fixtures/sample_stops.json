@@ -1,0 +1,20 @@
+[
+  {
+    "stop_id": "STOP_001",
+    "stop_name": "Victoria Square",
+    "stop_lat": -34.9296,
+    "stop_lon": 138.5999
+  },
+  {
+    "stop_id": "STOP_002",
+    "stop_name": "King William Street",
+    "stop_lat": -34.9258,
+    "stop_lon": 138.5998
+  },
+  {
+    "stop_id": "STOP_003",
+    "stop_name": "Rundle Mall",
+    "stop_lat": -34.9227,
+    "stop_lon": 138.6023
+  }
+]

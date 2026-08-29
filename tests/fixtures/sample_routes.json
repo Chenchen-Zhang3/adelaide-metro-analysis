@@ -1,0 +1,14 @@
+[
+  {
+    "route_id": "ROUTE_001",
+    "route_short_name": "G10",
+    "route_long_name": "Adelaide CBD Service",
+    "route_type": 3
+  },
+ {
+  "route_id": "ROUTE_002",
+  "route_short_name": "H30",
+  "route_long_name": "Adelaide Bus Service",
+  "route_type": 3
+}
+]
