@@ -7,8 +7,8 @@ from backend.parsers.static_gtfs import (
     parse_stops,
     parse_routes,
     parse_trips,
+    parse_stop_times,
 )
-
 
 class TestStaticGTFSParser(unittest.TestCase):
 
@@ -109,6 +109,35 @@ class TestStaticGTFSParser(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             parse_stops(file_path)
+
+    def test_parse_stop_times(self):
+        file_path = self.create_csv_file(
+            [
+                "trip_id",
+                "arrival_time",
+                "departure_time",
+                "stop_id",
+                "stop_sequence",
+            ],
+            [
+                {
+                "trip_id": "TRIP_001",
+                "arrival_time": "24:56:02",
+                "departure_time": "24:56:02",
+                "stop_id": "STOP_001",
+                "stop_sequence": "38",
+                }
+            ],
+        )
+
+        stop_times = parse_stop_times(file_path)
+
+        self.assertEqual(len(stop_times), 1)
+        self.assertEqual(stop_times[0]["trip_id"], "TRIP_001")
+        self.assertEqual(stop_times[0]["stop_id"], "STOP_001")
+        self.assertEqual(stop_times[0]["arrival_time"], "24:56:02")
+        self.assertEqual(stop_times[0]["stop_sequence"], 38)
+        self.assertIsInstance(stop_times[0]["stop_sequence"], int)
 
 
 if __name__ == "__main__":
