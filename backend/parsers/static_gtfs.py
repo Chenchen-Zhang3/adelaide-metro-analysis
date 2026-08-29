@@ -140,3 +140,55 @@ def parse_trips(file_path):
             trips.append(row)
 
     return trips
+
+def parse_stop_times(file_path):
+    file_path = Path(file_path)
+
+    if not file_path.exists():
+        raise FileNotFoundError(
+            f"GTFS stop_times file not found: {file_path}"
+        )
+
+    required_fields = {
+        "trip_id",
+        "arrival_time",
+        "departure_time",
+        "stop_id",
+        "stop_sequence",
+    }
+
+    stop_times = []
+
+    with file_path.open(
+        "r",
+        encoding="utf-8-sig",
+        newline=""
+    ) as file:
+
+        reader = csv.DictReader(file)
+
+        if reader.fieldnames is None:
+            raise ValueError(
+                "stop_times.txt does not contain a header row"
+            )
+
+        missing_fields = required_fields - set(reader.fieldnames)
+
+        if missing_fields:
+            raise ValueError(
+                f"stop_times.txt is missing required fields: "
+                f"{sorted(missing_fields)}"
+            )
+
+        for row in reader:
+            try:
+                row["stop_sequence"] = int(row["stop_sequence"])
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"Invalid stop_sequence for "
+                    f"trip_id {row.get('trip_id')}"
+                )
+
+            stop_times.append(row)
+
+    return stop_times
