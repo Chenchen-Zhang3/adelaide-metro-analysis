@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GTFS Stop Time",
+  "type": "object",
+  "required": [
+    "trip_id",
+    "arrival_time",
+    "departure_time",
+    "stop_id",
+    "stop_sequence"
+  ],
+  "properties": {
+    "trip_id": {
+      "type": "string"
+    },
+    "arrival_time": {
+      "type": "string"
+    },
+    "departure_time": {
+      "type": "string"
+    },
+    "stop_id": {
+      "type": "string"
+    },
+    "stop_sequence": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": true
+}

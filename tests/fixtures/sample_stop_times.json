@@ -1,0 +1,16 @@
+[
+  {
+    "trip_id": "TRIP_001",
+    "arrival_time": "09:00:00",
+    "departure_time": "09:01:00",
+    "stop_id": "STOP_001",
+    "stop_sequence": 1
+  },
+  {
+    "trip_id": "TRIP_001",
+    "arrival_time": "09:10:00",
+    "departure_time": "09:11:00",
+    "stop_id": "STOP_002",
+    "stop_sequence": 2
+  }
+]
