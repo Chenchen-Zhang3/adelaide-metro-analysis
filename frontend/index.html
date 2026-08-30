@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Adelaide Metro Transport Analysis</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+</head>
+
+<body>
+
+  <header>
+    <h1>Adelaide Metro Real-Time Transport Analysis</h1>
+    <p>Explore bus stops and transport information across Adelaide.</p>
+  </header>
+
+  <main>
+
+    <aside>
+      <h2>Transport Explorer</h2>
+
+      <section>
+        <h3>Location A</h3>
+        <button id="locationButton">Use My Location</button>
+      </section>
+
+      <section>
+        <h3>Nearby Stops</h3>
+        <div id="nearbyStops">
+          <p>No location selected yet.</p>
+        </div>
+      </section>
+    </aside>
+
+    <section>
+      <h2>Adelaide Map</h2>
+      <div id="map"></div>
+    </section>
+
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/map.js"></script>
+</body>
+</html>
