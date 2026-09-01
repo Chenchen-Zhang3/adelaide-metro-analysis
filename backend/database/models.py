@@ -5,6 +5,7 @@ def create_tables():
     connection = get_connection()
     cursor = connection.cursor()
 
+    # Routes
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS routes (
             route_id TEXT PRIMARY KEY,
@@ -14,6 +15,7 @@ def create_tables():
         )
     """)
 
+    # Stops
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stops (
             stop_id TEXT PRIMARY KEY,
@@ -23,6 +25,7 @@ def create_tables():
         )
     """)
 
+    # Trips
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             trip_id TEXT PRIMARY KEY,
@@ -33,6 +36,7 @@ def create_tables():
         )
     """)
 
+    # Stop Times
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stop_times (
             trip_id TEXT NOT NULL,
@@ -43,6 +47,7 @@ def create_tables():
         )
     """)
 
+    # Trip Updates
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trip_updates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -52,10 +57,12 @@ def create_tables():
             scheduled_arrival TEXT,
             actual_arrival TEXT,
             delay_seconds INTEGER NOT NULL,
-            timestamp TEXT
+            timestamp TEXT NOT NULL,
+            UNIQUE (trip_id, route_id, stop_id, timestamp)
         )
     """)
 
+    # Vehicle Positions
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS vehicle_positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,3 +82,4 @@ def create_tables():
 if __name__ == "__main__":
     create_tables()
     print("Database tables created successfully.")
+    
