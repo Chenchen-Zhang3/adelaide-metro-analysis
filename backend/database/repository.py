@@ -48,13 +48,14 @@ def get_stop(stop_id):
 
     return dict(row)
 
+
 def insert_trip_update(trip_update):
     connection = get_connection()
     cursor = connection.cursor()
 
     cursor.execute(
         """
-        INSERT INTO trip_updates (
+        INSERT OR IGNORE INTO trip_updates (
             trip_id,
             route_id,
             stop_id,
@@ -72,7 +73,7 @@ def insert_trip_update(trip_update):
             trip_update.get("scheduled_arrival"),
             trip_update.get("actual_arrival"),
             trip_update["delay_seconds"],
-            trip_update.get("timestamp"),
+            trip_update["timestamp"],
         ),
     )
 
@@ -89,6 +90,7 @@ def get_trip_updates(route_id):
         SELECT *
         FROM trip_updates
         WHERE route_id = ?
+        ORDER BY timestamp
         """,
         (route_id,),
     )

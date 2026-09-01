@@ -7,7 +7,7 @@ from backend.database.repository import (
 )
 
 
-# Make sure all database tables exist
+# Create database tables
 create_tables()
 
 
@@ -31,7 +31,7 @@ print(result)
 
 
 # ----------------------------
-# Test 2: Insert and retrieve a trip update
+# Test 2: Insert a trip update
 # ----------------------------
 
 sample_trip_update = {
@@ -48,5 +48,31 @@ insert_trip_update(sample_trip_update)
 
 updates = get_trip_updates("ROUTE_001")
 
-print("\nTrip update results:")
+print("\nTrip update results after first insert:")
 print(updates)
+
+
+# ----------------------------
+# Test 3: Duplicate handling
+# ----------------------------
+
+# Insert the exact same trip update again
+insert_trip_update(sample_trip_update)
+
+updates_after_duplicate = get_trip_updates("ROUTE_001")
+
+print("\nTrip update results after duplicate insert:")
+print(updates_after_duplicate)
+
+print("\nNumber of stored trip updates:")
+print(len(updates_after_duplicate))
+
+
+# ----------------------------
+# Test 4: Check duplicate prevention
+# ----------------------------
+
+if len(updates_after_duplicate) == 1:
+    print("\nDuplicate handling test PASSED.")
+else:
+    print("\nDuplicate handling test FAILED.")
