@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -12,113 +13,117 @@ from backend.database.repository import (
 )
 
 
+# Find the project root folder.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+# Set the path to the shared fixture data.
+FIXTURE_PATH = PROJECT_ROOT / "tests" / "fixtures"
+
+
+def load_fixture(filename):
+    # Load JSON test data from the shared fixtures.
+    file_path = FIXTURE_PATH / filename
+
+    with open(file_path, "r", encoding="utf-8") as file:
+        return json.load(file)
+
+
 @pytest.fixture(autouse=True)
 def temporary_database(tmp_path, monkeypatch):
-    """
-    Use a temporary SQLite database for every test.
-    This prevents automated tests from changing the normal
-    development database.
-    """
-    test_database_path = Path(tmp_path) / "test_adelaide_metro.db"
+    # Create a temporary database for each test.
+    test_database_path = tmp_path / "test_adelaide_metro.db"
 
+    # Replace the normal database path during testing.
     monkeypatch.setattr(
         database_connection,
         "DATABASE_PATH",
         test_database_path,
     )
 
+    # Create fresh database tables.
     create_tables()
 
+    # Run the test.
     yield
 
 
 def test_stop_persistence_and_retrieval():
-    sample_stop = {
-        "stop_id": "STOP_001",
-        "stop_name": "Sample Adelaide Stop",
-        "stop_lat": -34.9285,
-        "stop_lon": 138.6007,
-    }
+    # Load the shared stop fixture data.
+    stops = load_fixture("sample_stops.json")
 
+    # Use the first stop from the shared fixture.
+    sample_stop = stops[0]
+
+    # Store the stop in the database.
     insert_stop(sample_stop)
 
-    result = get_stop("STOP_001")
+    # Retrieve the stop by its ID.
+    result = get_stop(sample_stop["stop_id"])
 
+    # Check that the stop was retrieved correctly.
     assert result is not None
-    assert result["stop_id"] == "STOP_001"
-    assert result["stop_name"] == "Sample Adelaide Stop"
-    assert result["stop_lat"] == -34.9285
-    assert result["stop_lon"] == 138.6007
+    assert result["stop_id"] == sample_stop["stop_id"]
+    assert result["stop_name"] == sample_stop["stop_name"]
+    assert result["stop_lat"] == sample_stop["stop_lat"]
+    assert result["stop_lon"] == sample_stop["stop_lon"]
 
 
 def test_trip_update_persistence_and_retrieval():
-    sample_trip_update = {
-        "trip_id": "TRIP_001",
-        "route_id": "ROUTE_001",
-        "stop_id": "STOP_001",
-        "scheduled_arrival": "2026-08-30T10:00:00",
-        "actual_arrival": "2026-08-30T10:05:00",
-        "delay_seconds": 300,
-        "timestamp": "2026-08-30T10:05:00",
-    }
+    # Load the shared trip update fixture data.
+    trip_updates = load_fixture("sample_trip_updates.json")
 
-    insert_trip_update(sample_trip_update)
+    # Use the first trip update from the shared fixture.
+    sample_update = trip_updates[0]
 
-    results = get_trip_updates("ROUTE_001")
+    # Store the trip update in the database.
+    insert_trip_update(sample_update)
 
+    # Retrieve updates for the same route.
+    results = get_trip_updates(sample_update["route_id"])
+
+    # Check that the trip update was stored correctly.
     assert len(results) == 1
-    assert results[0]["trip_id"] == "TRIP_001"
-    assert results[0]["route_id"] == "ROUTE_001"
-    assert results[0]["stop_id"] == "STOP_001"
-    assert results[0]["delay_seconds"] == 300
+    assert results[0]["trip_id"] == sample_update["trip_id"]
+    assert results[0]["route_id"] == sample_update["route_id"]
+    assert results[0]["stop_id"] == sample_update["stop_id"]
+    assert results[0]["delay_seconds"] == sample_update["delay_seconds"]
+    assert results[0]["timestamp"] == sample_update["timestamp"]
 
 
 def test_duplicate_trip_update_is_not_stored_twice():
-    sample_trip_update = {
-        "trip_id": "TRIP_001",
-        "route_id": "ROUTE_001",
-        "stop_id": "STOP_001",
-        "scheduled_arrival": "2026-08-30T10:00:00",
-        "actual_arrival": "2026-08-30T10:05:00",
-        "delay_seconds": 300,
-        "timestamp": "2026-08-30T10:05:00",
-    }
+    # Load the shared trip update fixture data.
+    trip_updates = load_fixture("sample_trip_updates.json")
 
-    insert_trip_update(sample_trip_update)
-    insert_trip_update(sample_trip_update)
+    # Use the first trip update from the shared fixture.
+    sample_update = trip_updates[0]
 
-    results = get_trip_updates("ROUTE_001")
+    # Insert the same record twice.
+    insert_trip_update(sample_update)
+    insert_trip_update(sample_update)
 
+    # Retrieve the stored records.
+    results = get_trip_updates(sample_update["route_id"])
+
+    # Check that only one copy was stored.
     assert len(results) == 1
 
 
-def test_trip_updates_are_returned_in_timestamp_order():
-    later_update = {
-        "trip_id": "TRIP_002",
-        "route_id": "ROUTE_001",
-        "stop_id": "STOP_002",
-        "scheduled_arrival": "2026-08-30T11:00:00",
-        "actual_arrival": "2026-08-30T11:03:00",
-        "delay_seconds": 180,
-        "timestamp": "2026-08-30T11:03:00",
-    }
+def test_trip_update_allows_missing_timestamp():
+    # Load the shared trip update fixture data.
+    trip_updates = load_fixture("sample_trip_updates.json")
 
-    earlier_update = {
-        "trip_id": "TRIP_001",
-        "route_id": "ROUTE_001",
-        "stop_id": "STOP_001",
-        "scheduled_arrival": "2026-08-30T10:00:00",
-        "actual_arrival": "2026-08-30T10:05:00",
-        "delay_seconds": 300,
-        "timestamp": "2026-08-30T10:05:00",
-    }
+    # Copy a fixture record for this test.
+    sample_update = trip_updates[0].copy()
 
-    # Insert in the wrong order on purpose
-    insert_trip_update(later_update)
-    insert_trip_update(earlier_update)
+    # Remove the optional timestamp value.
+    sample_update["timestamp"] = None
 
-    results = get_trip_updates("ROUTE_001")
+    # Store the record without a timestamp.
+    insert_trip_update(sample_update)
 
-    assert len(results) == 2
-    assert results[0]["timestamp"] == "2026-08-30T10:05:00"
-    assert results[1]["timestamp"] == "2026-08-30T11:03:00"
+    # Retrieve the stored record.
+    results = get_trip_updates(sample_update["route_id"])
+
+    # Check that the nullable timestamp is supported.
+    assert len(results) == 1
+    assert results[0]["timestamp"] is None

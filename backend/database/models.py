@@ -2,10 +2,13 @@ from backend.database.connection import get_connection
 
 
 def create_tables():
+    # Open a connection to the SQLite database.
     connection = get_connection()
+
+    # Create a cursor for executing SQL statements.
     cursor = connection.cursor()
 
-    # Routes
+    # Create the routes table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS routes (
             route_id TEXT PRIMARY KEY,
@@ -15,7 +18,7 @@ def create_tables():
         )
     """)
 
-    # Stops
+    # Create the stops table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stops (
             stop_id TEXT PRIMARY KEY,
@@ -25,7 +28,7 @@ def create_tables():
         )
     """)
 
-    # Trips
+    # Create the trips table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             trip_id TEXT PRIMARY KEY,
@@ -36,7 +39,7 @@ def create_tables():
         )
     """)
 
-    # Stop Times
+    # Create the stop_times table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stop_times (
             trip_id TEXT NOT NULL,
@@ -47,7 +50,7 @@ def create_tables():
         )
     """)
 
-    # Trip Updates
+    # Create the trip_updates table for processed realtime records.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trip_updates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,12 +60,25 @@ def create_tables():
             scheduled_arrival TEXT,
             actual_arrival TEXT,
             delay_seconds INTEGER NOT NULL,
-            timestamp TEXT NOT NULL,
-            UNIQUE (trip_id, route_id, stop_id, timestamp)
+            timestamp TEXT
         )
     """)
 
-    # Vehicle Positions
+    # Create a unique index to prevent duplicate trip update records.
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_updates_unique
+        ON trip_updates (
+            trip_id,
+            route_id,
+            stop_id,
+            IFNULL(scheduled_arrival, ''),
+            IFNULL(actual_arrival, ''),
+            delay_seconds,
+            IFNULL(timestamp, '')
+        )
+    """)
+
+    # Create the vehicle_positions table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS vehicle_positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,11 +91,16 @@ def create_tables():
         )
     """)
 
+    # Save all table changes to the database.
     connection.commit()
+
+    # Close the database connection.
     connection.close()
 
 
 if __name__ == "__main__":
+    # Create the database tables when this file is run directly.
     create_tables()
+
+    # Show a simple success message.
     print("Database tables created successfully.")
-    
