@@ -8,7 +8,7 @@ independently while maintaining compatibility during integration.
 
 ---
 
-## 2. Data Ingestion → Shared Data
+## 2. Data Ingestion - Shared Data
 
 The GTFS ingestion and parsing module should convert source data into
 standardised objects following the schemas in:
@@ -22,10 +22,11 @@ Expected entities include:
 - Trip
 - Trip Update
 - Vehicle Position
+- Stop Time
 
 ---
 
-## 3. Ingestion → Historical Database
+## 3. Ingestion - Historical Database
 
 ### Input
 
@@ -44,7 +45,7 @@ These identifiers should remain consistent across modules.
 
 ---
 
-## 4. Historical Database → Performance Analysis
+## 4. Historical Database - Performance Analysis
 
 ### Input
 
@@ -71,7 +72,7 @@ Calculated performance information such as:
 
 ---
 
-## 5. Backend / Analysis → Frontend
+## 5. Backend / Analysis - Frontend
 
 The frontend should receive processed data rather than raw GTFS files.
 

@@ -17,6 +17,7 @@ Current schemas:
 - `trip.schema.json`
 - `trip-update.schema.json`
 - `vehicle.schema.json`
+- `stop-time.schema.json`
 
 ### constants/
 
