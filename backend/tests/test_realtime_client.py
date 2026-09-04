@@ -4,9 +4,10 @@ from urllib.error import HTTPError, URLError
 
 from backend.realtime.client import (
     GTFSRealtimeClient,
-    VEHICLE_POSITIONS_URL,
-    TRIP_UPDATES_URL,
-    SERVICE_ALERTS_URL,
+)
+from backend.realtime.config import (
+    DEFAULT_COLLECTION_SETTINGS,
+    GTFSRealtimeCollectionSettings,
 )
 
 
@@ -65,13 +66,60 @@ class TestGTFSRealtimeClient(unittest.TestCase):
         client = GTFSRealtimeClient()
 
         client.fetch_vehicle_positions()
-        mock_fetch.assert_called_with(VEHICLE_POSITIONS_URL)
+        mock_fetch.assert_called_with(
+            DEFAULT_COLLECTION_SETTINGS.vehicle_positions_url
+        )
 
         client.fetch_trip_updates()
-        mock_fetch.assert_called_with(TRIP_UPDATES_URL)
+        mock_fetch.assert_called_with(
+            DEFAULT_COLLECTION_SETTINGS.trip_updates_url
+        )
 
         client.fetch_service_alerts()
-        mock_fetch.assert_called_with(SERVICE_ALERTS_URL)
+        mock_fetch.assert_called_with(
+            DEFAULT_COLLECTION_SETTINGS.service_alerts_url
+        )
+
+    @patch("backend.realtime.client.urlopen")
+    def test_client_uses_configured_timeout_and_user_agent(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b"protobuf-data"
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        settings = GTFSRealtimeCollectionSettings(
+            request_timeout_seconds=25,
+            user_agent="test-collector/1.0",
+        )
+
+        GTFSRealtimeClient(settings).fetch("https://example.com/feed")
+
+        request = mock_urlopen.call_args.args[0]
+        self.assertEqual(mock_urlopen.call_args.kwargs["timeout"], 25)
+        self.assertEqual(request.get_header("User-agent"), "test-collector/1.0")
+
+    def test_client_uses_configured_feed_urls(self):
+        settings = GTFSRealtimeCollectionSettings(
+            vehicle_positions_url="https://example.com/vehicles",
+            trip_updates_url="https://example.com/trips",
+            service_alerts_url="https://example.com/alerts",
+        )
+        client = GTFSRealtimeClient(settings)
+
+        with patch.object(client, "fetch", return_value=b"data") as mock_fetch:
+            client.fetch_vehicle_positions()
+            mock_fetch.assert_called_with("https://example.com/vehicles")
+
+            client.fetch_trip_updates()
+            mock_fetch.assert_called_with("https://example.com/trips")
+
+            client.fetch_service_alerts()
+            mock_fetch.assert_called_with("https://example.com/alerts")
+
+    def test_collection_settings_reject_non_positive_intervals(self):
+        with self.assertRaises(ValueError):
+            GTFSRealtimeCollectionSettings(polling_interval_seconds=0)
+
+        with self.assertRaises(ValueError):
+            GTFSRealtimeCollectionSettings(request_timeout_seconds=0)
 
 
 if __name__ == "__main__":

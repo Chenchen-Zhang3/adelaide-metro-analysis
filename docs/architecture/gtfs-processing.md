@@ -54,6 +54,17 @@ The client accesses the Adelaide Metro GTFS-Realtime feeds for:
 - Trip Updates
 - Service Alerts
 
+### Collection configuration
+
+Collection parameters are centralised in `backend/realtime/config.py`.
+`GTFSRealtimeCollectionSettings` defines the three feed URLs, request timeout,
+polling interval and HTTP user agent. The default polling interval is 60 seconds
+and the default request timeout is 10 seconds.
+
+The realtime client receives these settings rather than hard-coding collection
+parameters. This allows a future scheduled collector to use the same polling
+policy without changing the existing fetch, decoding or conversion logic.
+
 The API responses are returned as raw protobuf bytes.
 
 These bytes are decoded by:

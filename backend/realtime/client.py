@@ -1,28 +1,26 @@
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-
-BASE_URL = "https://gtfs.adelaidemetro.com.au/v1"
-
-VEHICLE_POSITIONS_URL = f"{BASE_URL}/realtime/vehicle_positions"
-TRIP_UPDATES_URL = f"{BASE_URL}/realtime/trip_updates"
-SERVICE_ALERTS_URL = f"{BASE_URL}/realtime/service_alerts"
+from backend.realtime.config import DEFAULT_COLLECTION_SETTINGS
 
 
 class GTFSRealtimeClient:
-    def __init__(self, timeout=10):
-        self.timeout = timeout
+    def __init__(self, settings=DEFAULT_COLLECTION_SETTINGS):
+        self.settings = settings
 
     def fetch(self, url):
         request = Request(
             url,
             headers={
-                "User-Agent": "adelaide-metro-analysis/1.0"
+                "User-Agent": self.settings.user_agent
             },
         )
 
         try:
-            with urlopen(request, timeout=self.timeout) as response:
+            with urlopen(
+                request,
+                timeout=self.settings.request_timeout_seconds,
+            ) as response:
                 data = response.read()
 
         except HTTPError as error:
@@ -43,10 +41,10 @@ class GTFSRealtimeClient:
         return data
 
     def fetch_vehicle_positions(self):
-        return self.fetch(VEHICLE_POSITIONS_URL)
+        return self.fetch(self.settings.vehicle_positions_url)
 
     def fetch_trip_updates(self):
-        return self.fetch(TRIP_UPDATES_URL)
+        return self.fetch(self.settings.trip_updates_url)
 
     def fetch_service_alerts(self):
-        return self.fetch(SERVICE_ALERTS_URL)
+        return self.fetch(self.settings.service_alerts_url)
