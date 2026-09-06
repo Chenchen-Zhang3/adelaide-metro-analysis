@@ -2,10 +2,10 @@ from backend.database.connection import get_connection
 
 
 def create_tables():
-    # Open a connection to the SQLite database.
+    # Open the SQLite database connection.
     connection = get_connection()
 
-    # Create a cursor for executing SQL statements.
+    # Create a cursor for SQL commands.
     cursor = connection.cursor()
 
     # Create the routes table.
@@ -39,7 +39,7 @@ def create_tables():
         )
     """)
 
-    # Create the stop_times table.
+    # Create the stop times table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS stop_times (
             trip_id TEXT NOT NULL,
@@ -50,7 +50,17 @@ def create_tables():
         )
     """)
 
-    # Create the trip_updates table for processed realtime records.
+    # Prevent duplicate stop time records.
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_stop_times_unique
+        ON stop_times (
+            trip_id,
+            stop_id,
+            stop_sequence
+        )
+    """)
+
+    # Create the trip updates table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS trip_updates (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +74,7 @@ def create_tables():
         )
     """)
 
-    # Create a unique index to prevent duplicate trip update records.
+    # Prevent duplicate trip update records.
     cursor.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_trip_updates_unique
         ON trip_updates (
@@ -78,7 +88,35 @@ def create_tables():
         )
     """)
 
-    # Create the vehicle_positions table.
+    # Create an index for route queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trip_updates_route
+        ON trip_updates (route_id)
+    """)
+
+    # Create an index for stop queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trip_updates_stop
+        ON trip_updates (stop_id)
+    """)
+
+    # Create an index for time queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trip_updates_timestamp
+        ON trip_updates (timestamp)
+    """)
+
+    # Create an index for combined filters.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trip_updates_filters
+        ON trip_updates (
+            route_id,
+            stop_id,
+            timestamp
+        )
+    """)
+
+    # Create the vehicle positions table.
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS vehicle_positions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -91,7 +129,20 @@ def create_tables():
         )
     """)
 
-    # Save all table changes to the database.
+    # Prevent duplicate vehicle position records.
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_vehicle_positions_unique
+        ON vehicle_positions (
+            vehicle_id,
+            IFNULL(trip_id, ''),
+            IFNULL(route_id, ''),
+            latitude,
+            longitude,
+            IFNULL(timestamp, '')
+        )
+    """)
+
+    # Save all database changes.
     connection.commit()
 
     # Close the database connection.
@@ -99,8 +150,8 @@ def create_tables():
 
 
 if __name__ == "__main__":
-    # Create the database tables when this file is run directly.
+    # Create all database tables and indexes.
     create_tables()
 
-    # Show a simple success message.
+    # Show a success message.
     print("Database tables created successfully.")
