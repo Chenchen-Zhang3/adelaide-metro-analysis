@@ -58,8 +58,9 @@ The client accesses the Adelaide Metro GTFS-Realtime feeds for:
 
 Collection parameters are centralised in `backend/realtime/config.py`.
 `GTFSRealtimeCollectionSettings` defines the three feed URLs, request timeout,
-polling interval and HTTP user agent. The default polling interval is 60 seconds
-and the default request timeout is 10 seconds.
+polling interval, retry settings and HTTP user agent. The default polling
+interval is 60 seconds, the request timeout is 10 seconds, and the collector
+may retry a temporary failure twice with a five-second retry delay.
 
 The realtime client receives these settings rather than hard-coding collection
 parameters. This allows a future scheduled collector to use the same polling
@@ -84,8 +85,16 @@ step; it does not write to the database itself.
 `run()` repeats this collection cycle using
 `GTFSRealtimeCollectionSettings.polling_interval_seconds`. The optional
 `max_cycles` argument makes scheduled behaviour testable without waiting for a
-live feed or a real timer. Retry/backoff and record-level validation are not
-implemented here because they are separate Sprint 2 tasks.
+live feed or a real timer. Record-level validation is intentionally left to a
+separate Sprint 2 task.
+
+### Resilient feed retrieval
+
+The collector retries a connection failure, timeout, or temporary HTTP response
+(408, 429, or a 5xx status) using the configured retry delay. Permanent HTTP
+errors, such as 403, fail immediately rather than repeatedly requesting the
+feed. When the retries for a temporary failure are exhausted, that collection
+cycle is skipped and the scheduled collector proceeds to its next cycle.
 
 ---
 

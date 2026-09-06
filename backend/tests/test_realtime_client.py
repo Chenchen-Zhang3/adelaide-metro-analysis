@@ -4,6 +4,8 @@ from urllib.error import HTTPError, URLError
 
 from backend.realtime.client import (
     GTFSRealtimeClient,
+    GTFSRealtimeHTTPError,
+    GTFSRealtimeTimeoutError,
 )
 from backend.realtime.config import (
     DEFAULT_COLLECTION_SETTINGS,
@@ -47,8 +49,10 @@ class TestGTFSRealtimeClient(unittest.TestCase):
 
         client = GTFSRealtimeClient()
 
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(GTFSRealtimeHTTPError) as context:
             client.fetch("https://example.com/feed")
+
+        self.assertEqual(context.exception.status_code, 403)
 
     @patch("backend.realtime.client.urlopen")
     def test_fetch_connection_error(self, mock_urlopen):
@@ -57,6 +61,15 @@ class TestGTFSRealtimeClient(unittest.TestCase):
         client = GTFSRealtimeClient()
 
         with self.assertRaises(RuntimeError):
+            client.fetch("https://example.com/feed")
+
+    @patch("backend.realtime.client.urlopen")
+    def test_fetch_timeout_error(self, mock_urlopen):
+        mock_urlopen.side_effect = TimeoutError("Request timed out")
+
+        client = GTFSRealtimeClient()
+
+        with self.assertRaises(GTFSRealtimeTimeoutError):
             client.fetch("https://example.com/feed")
 
     @patch.object(GTFSRealtimeClient, "fetch")
@@ -120,6 +133,12 @@ class TestGTFSRealtimeClient(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             GTFSRealtimeCollectionSettings(request_timeout_seconds=0)
+
+        with self.assertRaises(ValueError):
+            GTFSRealtimeCollectionSettings(max_retry_attempts=-1)
+
+        with self.assertRaises(ValueError):
+            GTFSRealtimeCollectionSettings(retry_delay_seconds=0)
 
 
 if __name__ == "__main__":

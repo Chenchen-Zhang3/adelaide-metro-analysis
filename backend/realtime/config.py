@@ -20,6 +20,8 @@ class GTFSRealtimeCollectionSettings:
     service_alerts_url: str = f"{BASE_URL}/realtime/service_alerts"
     polling_interval_seconds: int = 60
     request_timeout_seconds: int = 10
+    max_retry_attempts: int = 2
+    retry_delay_seconds: int = 5
     user_agent: str = "adelaide-metro-analysis/1.0"
 
     def __post_init__(self):
@@ -27,6 +29,10 @@ class GTFSRealtimeCollectionSettings:
             raise ValueError("Polling interval must be greater than zero")
         if self.request_timeout_seconds <= 0:
             raise ValueError("Request timeout must be greater than zero")
+        if self.max_retry_attempts < 0:
+            raise ValueError("Maximum retry attempts cannot be negative")
+        if self.retry_delay_seconds <= 0:
+            raise ValueError("Retry delay must be greater than zero")
 
 
 DEFAULT_COLLECTION_SETTINGS = GTFSRealtimeCollectionSettings()
