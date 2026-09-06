@@ -4,6 +4,28 @@ from urllib.error import HTTPError, URLError
 from backend.realtime.config import DEFAULT_COLLECTION_SETTINGS
 
 
+class GTFSRealtimeRequestError(RuntimeError):
+    """Base error for a GTFS-Realtime HTTP request."""
+
+
+class GTFSRealtimeHTTPError(GTFSRealtimeRequestError):
+    """HTTP error that preserves its status code for retry decisions."""
+
+    def __init__(self, url, status_code):
+        super().__init__(
+            f"GTFS-Realtime request failed with HTTP {status_code}: {url}"
+        )
+        self.status_code = status_code
+
+
+class GTFSRealtimeConnectionError(GTFSRealtimeRequestError):
+    """Connection failure while contacting a GTFS-Realtime endpoint."""
+
+
+class GTFSRealtimeTimeoutError(GTFSRealtimeRequestError):
+    """Timeout while contacting a GTFS-Realtime endpoint."""
+
+
 class GTFSRealtimeClient:
     def __init__(self, settings=DEFAULT_COLLECTION_SETTINGS):
         self.settings = settings
@@ -24,13 +46,24 @@ class GTFSRealtimeClient:
                 data = response.read()
 
         except HTTPError as error:
-            raise RuntimeError(
-                f"GTFS-Realtime request failed with HTTP {error.code}: {url}"
+            raise GTFSRealtimeHTTPError(
+                url,
+                error.code,
             ) from error
 
         except URLError as error:
-            raise RuntimeError(
+            if isinstance(error.reason, TimeoutError):
+                raise GTFSRealtimeTimeoutError(
+                    f"GTFS-Realtime request timed out: {url}"
+                ) from error
+
+            raise GTFSRealtimeConnectionError(
                 f"Could not connect to GTFS-Realtime endpoint: {url}"
+            ) from error
+
+        except TimeoutError as error:
+            raise GTFSRealtimeTimeoutError(
+                f"GTFS-Realtime request timed out: {url}"
             ) from error
 
         if not data:

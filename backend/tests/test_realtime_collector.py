@@ -4,6 +4,12 @@ from unittest.mock import MagicMock
 from google.transit import gtfs_realtime_pb2
 
 from backend.realtime.collector import GTFSRealtimeCollector
+from backend.realtime.collector import GTFSRealtimeRetryExhaustedError
+from backend.realtime.client import (
+    GTFSRealtimeConnectionError,
+    GTFSRealtimeHTTPError,
+    GTFSRealtimeTimeoutError,
+)
 from backend.realtime.config import GTFSRealtimeCollectionSettings
 
 
@@ -43,9 +49,16 @@ class TestGTFSRealtimeCollector(unittest.TestCase):
 
         return feed.SerializeToString()
 
-    def make_client(self, polling_interval_seconds=60):
+    def make_client(
+        self,
+        polling_interval_seconds=60,
+        max_retry_attempts=2,
+        retry_delay_seconds=5,
+    ):
         settings = GTFSRealtimeCollectionSettings(
             polling_interval_seconds=polling_interval_seconds,
+            max_retry_attempts=max_retry_attempts,
+            retry_delay_seconds=retry_delay_seconds,
         )
         client = MagicMock()
         client.settings = settings
@@ -71,6 +84,100 @@ class TestGTFSRealtimeCollector(unittest.TestCase):
         client.fetch_trip_updates.assert_called_once_with()
         self.assertEqual(result["vehicle_positions"][0]["vehicle_id"], "2606")
         self.assertEqual(result["trip_updates"][0]["delay_seconds"], 470)
+
+    def test_retries_connection_failure_then_processes_feed(self):
+        client = self.make_client(retry_delay_seconds=3)
+        client.fetch_vehicle_positions.side_effect = [
+            GTFSRealtimeConnectionError("Network unavailable"),
+            self.create_vehicle_feed_bytes(),
+        ]
+        sleep_function = MagicMock()
+        collector = GTFSRealtimeCollector(
+            client=client,
+            sleep_function=sleep_function,
+        )
+
+        result = collector.collect_once()
+
+        self.assertEqual(client.fetch_vehicle_positions.call_count, 2)
+        sleep_function.assert_called_once_with(3)
+        self.assertEqual(result["vehicle_positions"][0]["vehicle_id"], "2606")
+
+    def test_retries_timeout_and_temporary_http_error(self):
+        client = self.make_client(retry_delay_seconds=2)
+        client.fetch_vehicle_positions.side_effect = [
+            GTFSRealtimeTimeoutError("Request timed out"),
+            self.create_vehicle_feed_bytes(),
+        ]
+        client.fetch_trip_updates.side_effect = [
+            GTFSRealtimeHTTPError("https://example.com/trips", 503),
+            self.create_trip_update_feed_bytes(),
+        ]
+        sleep_function = MagicMock()
+        collector = GTFSRealtimeCollector(
+            client=client,
+            sleep_function=sleep_function,
+        )
+
+        collector.collect_once()
+
+        self.assertEqual(client.fetch_vehicle_positions.call_count, 2)
+        self.assertEqual(client.fetch_trip_updates.call_count, 2)
+        self.assertEqual(sleep_function.call_count, 2)
+        sleep_function.assert_called_with(2)
+
+    def test_does_not_retry_non_recoverable_http_error(self):
+        client = self.make_client()
+        client.fetch_vehicle_positions.side_effect = GTFSRealtimeHTTPError(
+            "https://example.com/vehicles",
+            403,
+        )
+        sleep_function = MagicMock()
+        collector = GTFSRealtimeCollector(
+            client=client,
+            sleep_function=sleep_function,
+        )
+
+        with self.assertRaises(GTFSRealtimeHTTPError):
+            collector.collect_once()
+
+        client.fetch_vehicle_positions.assert_called_once_with()
+        sleep_function.assert_not_called()
+
+    def test_raises_after_configured_retry_attempts_are_exhausted(self):
+        client = self.make_client(max_retry_attempts=1, retry_delay_seconds=4)
+        client.fetch_vehicle_positions.side_effect = GTFSRealtimeConnectionError(
+            "Network unavailable"
+        )
+        sleep_function = MagicMock()
+        collector = GTFSRealtimeCollector(
+            client=client,
+            sleep_function=sleep_function,
+        )
+
+        with self.assertRaises(GTFSRealtimeRetryExhaustedError):
+            collector.collect_once()
+
+        self.assertEqual(client.fetch_vehicle_positions.call_count, 2)
+        sleep_function.assert_called_once_with(4)
+
+    def test_retries_exhausted_cycle_does_not_stop_future_cycles(self):
+        client = self.make_client(max_retry_attempts=1, retry_delay_seconds=4)
+        sleep_function = MagicMock()
+        collector = GTFSRealtimeCollector(
+            client=client,
+            sleep_function=sleep_function,
+        )
+        collector.collect_once = MagicMock(side_effect=[
+            GTFSRealtimeRetryExhaustedError("Retry attempts exhausted"),
+            {"records": []},
+        ])
+
+        result = collector.run(max_cycles=2)
+
+        self.assertEqual(result, [{"records": []}])
+        self.assertEqual(collector.collect_once.call_count, 2)
+        sleep_function.assert_called_once_with(60)
 
     def test_run_uses_configured_interval_between_cycles(self):
         client = self.make_client(polling_interval_seconds=25)

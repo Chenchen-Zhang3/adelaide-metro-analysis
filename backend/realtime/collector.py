@@ -2,7 +2,13 @@
 
 from time import sleep
 
-from backend.realtime.client import GTFSRealtimeClient
+from backend.realtime.client import (
+    GTFSRealtimeClient,
+    GTFSRealtimeConnectionError,
+    GTFSRealtimeHTTPError,
+    GTFSRealtimeRequestError,
+    GTFSRealtimeTimeoutError,
+)
 from backend.realtime.decoder import decode_feed
 from backend.services.gtfs_converter import (
     convert_trip_update,
@@ -10,13 +16,17 @@ from backend.services.gtfs_converter import (
 )
 
 
+class GTFSRealtimeRetryExhaustedError(RuntimeError):
+    """A recoverable feed request still failed after its configured retries."""
+
+
 class GTFSRealtimeCollector:
     """Periodically fetch and process the supported GTFS-Realtime feeds.
 
     The collector coordinates existing components only: the HTTP client obtains
     bytes, the decoder creates a FeedMessage, and the converter creates the
-    project's shared records. Retry and record-validation policy intentionally
-    belong to later Sprint 2 tasks.
+    project's shared records. It retries temporary retrieval failures using the
+    collection settings. Record-validation policy belongs to a later task.
     """
 
     def __init__(
@@ -29,10 +39,51 @@ class GTFSRealtimeCollector:
         self.stop_time_index = stop_time_index or {}
         self.sleep_function = sleep_function
 
+    def _is_retryable_error(self, error):
+        if isinstance(
+            error,
+            (GTFSRealtimeConnectionError, GTFSRealtimeTimeoutError),
+        ):
+            return True
+
+        if isinstance(error, GTFSRealtimeHTTPError):
+            return (
+                error.status_code in {408, 429}
+                or error.status_code >= 500
+            )
+
+        return False
+
+    def _fetch_with_retry(self, fetch_feed):
+        """Fetch one feed, waiting between retries for temporary failures."""
+        retry_attempt = 0
+
+        while True:
+            try:
+                return fetch_feed()
+            except GTFSRealtimeRequestError as error:
+                if not self._is_retryable_error(error):
+                    raise
+
+                if retry_attempt >= self.client.settings.max_retry_attempts:
+                    raise GTFSRealtimeRetryExhaustedError(
+                        "GTFS-Realtime request failed after "
+                        f"{retry_attempt} retry attempts"
+                    ) from error
+
+                retry_attempt += 1
+                self.sleep_function(
+                    self.client.settings.retry_delay_seconds
+                )
+
     def collect_once(self):
         """Fetch, decode and convert one Vehicle Positions and Trip Updates cycle."""
-        vehicle_feed = decode_feed(self.client.fetch_vehicle_positions())
-        trip_update_feed = decode_feed(self.client.fetch_trip_updates())
+        vehicle_feed = decode_feed(
+            self._fetch_with_retry(self.client.fetch_vehicle_positions)
+        )
+        trip_update_feed = decode_feed(
+            self._fetch_with_retry(self.client.fetch_trip_updates)
+        )
 
         vehicle_positions = [
             convert_vehicle_position(entity)
@@ -61,7 +112,10 @@ class GTFSRealtimeCollector:
         results = []
 
         while max_cycles is None or completed_cycles < max_cycles:
-            results.append(self.collect_once())
+            try:
+                results.append(self.collect_once())
+            except GTFSRealtimeRetryExhaustedError:
+                pass
             completed_cycles += 1
 
             if max_cycles is None or completed_cycles < max_cycles:
