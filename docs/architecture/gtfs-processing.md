@@ -73,6 +73,20 @@ These bytes are decoded by:
 
 The decoder converts the protobuf response into a GTFS-Realtime `FeedMessage`.
 
+### Scheduled collection
+
+`backend/realtime/collector.py` provides `GTFSRealtimeCollector`. One
+collection cycle fetches the supported Vehicle Positions and Trip Updates feeds,
+decodes their raw protobuf bytes, and passes their entities to the existing
+shared-data converters. It returns processed records for the next persistence
+step; it does not write to the database itself.
+
+`run()` repeats this collection cycle using
+`GTFSRealtimeCollectionSettings.polling_interval_seconds`. The optional
+`max_cycles` argument makes scheduled behaviour testable without waiting for a
+live feed or a real timer. Retry/backoff and record-level validation are not
+implemented here because they are separate Sprint 2 tasks.
+
 ---
 
 ## Shared Data Conversion
