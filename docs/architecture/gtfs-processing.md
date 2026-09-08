@@ -96,6 +96,19 @@ errors, such as 403, fail immediately rather than repeatedly requesting the
 feed. When the retries for a temporary failure are exhausted, that collection
 cycle is skipped and the scheduled collector proceeds to its next cycle.
 
+### Record validation and missing-data handling
+
+`backend/realtime/validation.py` validates decoded entities before conversion.
+Vehicle Positions require a vehicle ID and position; trip and route identifiers
+remain optional for Vehicle Positions because the shared schema permits them to
+be `null`. Trip Updates require a trip ID, route ID and start date because the
+existing delay conversion needs all three.
+
+Incomplete stop-time updates are skipped when they lack a stop ID, stop
+sequence or arrival time. The collector processes records entity-by-entity, so
+an invalid entity is skipped while valid entities in the same feed continue to
+be converted.
+
 ---
 
 ## Shared Data Conversion
@@ -171,6 +184,7 @@ The current test suite covers:
 - Required field validation
 - GTFS-Realtime HTTP client behaviour
 - Realtime protobuf decoding
+- Realtime record validation and invalid-record skipping
 - Shared data conversion
 - GTFS times greater than 24:00
 - Stop-time indexing
