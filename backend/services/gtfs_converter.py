@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from backend.realtime.validation import is_valid_stop_time_update
+
 
 ADELAIDE_TIMEZONE = ZoneInfo("Australia/Adelaide")
 
@@ -139,6 +141,9 @@ def convert_trip_update(entity, stop_time_index):
     records = []
 
     for stop_update in trip_update.stop_time_update:
+        if not is_valid_stop_time_update(stop_update):
+            continue
+
         stop_id = str(stop_update.stop_id)
         stop_sequence = int(stop_update.stop_sequence)
 
@@ -151,12 +156,6 @@ def convert_trip_update(entity, stop_time_index):
         scheduled_stop = stop_time_index.get(key)
 
         if scheduled_stop is None:
-            continue
-
-        if not stop_update.HasField("arrival"):
-            continue
-
-        if not stop_update.arrival.time:
             continue
 
         scheduled_datetime = gtfs_time_to_datetime(

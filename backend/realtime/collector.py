@@ -10,6 +10,10 @@ from backend.realtime.client import (
     GTFSRealtimeTimeoutError,
 )
 from backend.realtime.decoder import decode_feed
+from backend.realtime.validation import (
+    is_valid_trip_update,
+    is_valid_vehicle_position,
+)
 from backend.services.gtfs_converter import (
     convert_trip_update,
     convert_vehicle_position,
@@ -76,6 +80,38 @@ class GTFSRealtimeCollector:
                     self.client.settings.retry_delay_seconds
                 )
 
+    def _convert_vehicle_positions(self, feed):
+        """Convert valid vehicle entities without stopping on an invalid one."""
+        records = []
+
+        for entity in feed.entity:
+            if not is_valid_vehicle_position(entity):
+                continue
+
+            try:
+                records.append(convert_vehicle_position(entity))
+            except ValueError:
+                continue
+
+        return records
+
+    def _convert_trip_updates(self, feed):
+        """Convert valid trip entities without stopping on an invalid one."""
+        records = []
+
+        for entity in feed.entity:
+            if not is_valid_trip_update(entity):
+                continue
+
+            try:
+                records.extend(
+                    convert_trip_update(entity, self.stop_time_index)
+                )
+            except ValueError:
+                continue
+
+        return records
+
     def collect_once(self):
         """Fetch, decode and convert one Vehicle Positions and Trip Updates cycle."""
         vehicle_feed = decode_feed(
@@ -85,21 +121,9 @@ class GTFSRealtimeCollector:
             self._fetch_with_retry(self.client.fetch_trip_updates)
         )
 
-        vehicle_positions = [
-            convert_vehicle_position(entity)
-            for entity in vehicle_feed.entity
-            if entity.HasField("vehicle")
-        ]
-        trip_updates = [
-            record
-            for entity in trip_update_feed.entity
-            if entity.HasField("trip_update")
-            for record in convert_trip_update(entity, self.stop_time_index)
-        ]
-
         return {
-            "vehicle_positions": vehicle_positions,
-            "trip_updates": trip_updates,
+            "vehicle_positions": self._convert_vehicle_positions(vehicle_feed),
+            "trip_updates": self._convert_trip_updates(trip_update_feed),
         }
 
     def run(self, max_cycles=None):
