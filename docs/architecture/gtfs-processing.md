@@ -109,6 +109,19 @@ sequence or arrival time. The collector processes records entity-by-entity, so
 an invalid entity is skipped while valid entities in the same feed continue to
 be converted.
 
+### Historical database handoff
+
+`backend/services/historical_records.py` maps validated converter output to the
+plain-dictionary contract accepted by the database repository. Vehicle Position
+records contain `vehicle_id`, optional `trip_id` and `route_id`, `latitude`,
+`longitude`, and an optional ISO 8601 `timestamp`. Trip Update records contain
+`trip_id`, `route_id`, `stop_id`, optional arrival timestamps, integer
+`delay_seconds`, and an optional ISO 8601 `timestamp`.
+
+The adapter normalises missing optional values to `None`, preserves identifier
+strings and numeric fields, and does not insert data itself. The caller can pass
+its output directly to `insert_vehicle_position()` or `insert_trip_update()`.
+
 ---
 
 ## Shared Data Conversion
@@ -185,6 +198,7 @@ The current test suite covers:
 - GTFS-Realtime HTTP client behaviour
 - Realtime protobuf decoding
 - Realtime record validation and invalid-record skipping
+- Historical record handoff and database repository compatibility
 - Shared data conversion
 - GTFS times greater than 24:00
 - Stop-time indexing
