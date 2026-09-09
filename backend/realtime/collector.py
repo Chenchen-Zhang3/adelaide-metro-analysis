@@ -18,6 +18,10 @@ from backend.services.gtfs_converter import (
     convert_trip_update,
     convert_vehicle_position,
 )
+from backend.services.historical_records import (
+    prepare_trip_update_record,
+    prepare_vehicle_position_record,
+)
 
 
 class GTFSRealtimeRetryExhaustedError(RuntimeError):
@@ -89,7 +93,11 @@ class GTFSRealtimeCollector:
                 continue
 
             try:
-                records.append(convert_vehicle_position(entity))
+                records.append(
+                    prepare_vehicle_position_record(
+                        convert_vehicle_position(entity)
+                    )
+                )
             except ValueError:
                 continue
 
@@ -105,7 +113,11 @@ class GTFSRealtimeCollector:
 
             try:
                 records.extend(
-                    convert_trip_update(entity, self.stop_time_index)
+                    prepare_trip_update_record(record)
+                    for record in convert_trip_update(
+                        entity,
+                        self.stop_time_index,
+                    )
                 )
             except ValueError:
                 continue
