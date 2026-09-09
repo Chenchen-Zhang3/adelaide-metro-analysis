@@ -173,6 +173,17 @@ Delay is calculated as:
 
 `delay_seconds = actual_arrival - scheduled_arrival`
 
+Both values are timezone-aware Adelaide datetimes. GTFS service times may be
+greater than 24:00 and are carried into the following calendar day while
+retaining their original service date context. A negative `delay_seconds` is
+preserved for an early arrival and zero is preserved for an exactly scheduled
+arrival; classification belongs to the analysis module.
+
+Missing actual arrival data or a missing static stop-time match does not create
+a guessed delay record. Unix timestamps are converted using
+`ZoneInfo("Australia/Adelaide")`, so daylight-saving offsets are applied rather
+than hard-coded.
+
 The processed trip update then contains:
 
 - trip ID

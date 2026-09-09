@@ -45,26 +45,41 @@ def convert_stop_time(stop_time):
     }
 
 
-def unix_timestamp_to_iso(timestamp):
-    if not timestamp:
+def unix_timestamp_to_datetime(timestamp):
+    if timestamp is None:
         return None
+
+    if isinstance(timestamp, bool) or not isinstance(timestamp, (int, float)):
+        raise TypeError("Unix timestamp must be a number or None")
 
     return datetime.fromtimestamp(
         timestamp,
         tz=ADELAIDE_TIMEZONE
-    ).isoformat()
+    )
+
+
+def unix_timestamp_to_iso(timestamp):
+    converted_timestamp = unix_timestamp_to_datetime(timestamp)
+
+    if converted_timestamp is None:
+        return None
+
+    return converted_timestamp.isoformat()
 
 
 def gtfs_time_to_datetime(service_date, gtfs_time):
+    try:
+        hours, minutes, seconds = map(int, gtfs_time.split(":"))
+    except (AttributeError, ValueError) as error:
+        raise ValueError("GTFS time must use HH:MM:SS format") from error
+
+    if hours < 0 or not 0 <= minutes < 60 or not 0 <= seconds < 60:
+        raise ValueError("GTFS time contains an invalid clock value")
+
     base_date = datetime.strptime(
         service_date,
         "%Y%m%d"
     ).replace(tzinfo=ADELAIDE_TIMEZONE)
-
-    hours, minutes, seconds = map(
-        int,
-        gtfs_time.split(":")
-    )
 
     return base_date + timedelta(
         hours=hours,
@@ -88,6 +103,22 @@ def build_stop_time_index(stop_times):
     return index
 
 
+def calculate_delay_seconds(scheduled_datetime, actual_datetime):
+    """Return raw delay seconds for two timezone-aware arrival datetimes."""
+    if (
+        scheduled_datetime.tzinfo is None
+        or scheduled_datetime.utcoffset() is None
+        or actual_datetime.tzinfo is None
+        or actual_datetime.utcoffset() is None
+    ):
+        raise ValueError("Arrival datetimes must be timezone-aware")
+
+    return int(
+        actual_datetime.timestamp()
+        - scheduled_datetime.timestamp()
+    )
+
+
 def convert_vehicle_position(entity):
     if not entity.HasField("vehicle"):
         raise ValueError("Entity does not contain a vehicle position")
@@ -106,7 +137,9 @@ def convert_vehicle_position(entity):
         "route_id": None,
         "latitude": float(vehicle.position.latitude),
         "longitude": float(vehicle.position.longitude),
-        "timestamp": unix_timestamp_to_iso(vehicle.timestamp),
+        "timestamp": unix_timestamp_to_iso(
+            vehicle.timestamp if vehicle.HasField("timestamp") else None
+        ),
     }
 
     if vehicle.HasField("trip"):
@@ -163,14 +196,12 @@ def convert_trip_update(entity, stop_time_index):
             scheduled_stop["arrival_time"],
         )
 
-        actual_datetime = datetime.fromtimestamp(
-            stop_update.arrival.time,
-            tz=ADELAIDE_TIMEZONE,
+        actual_datetime = unix_timestamp_to_datetime(
+            stop_update.arrival.time
         )
-
-        delay_seconds = int(
-            actual_datetime.timestamp()
-            - scheduled_datetime.timestamp()
+        delay_seconds = calculate_delay_seconds(
+            scheduled_datetime,
+            actual_datetime,
         )
 
         records.append({
@@ -182,6 +213,8 @@ def convert_trip_update(entity, stop_time_index):
             "delay_seconds": delay_seconds,
             "timestamp": unix_timestamp_to_iso(
                 trip_update.timestamp
+                if trip_update.HasField("timestamp")
+                else None
             ),
         })
 

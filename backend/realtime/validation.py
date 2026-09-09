@@ -32,5 +32,5 @@ def is_valid_stop_time_update(stop_update):
         bool(stop_update.stop_id)
         and bool(stop_update.stop_sequence)
         and stop_update.HasField("arrival")
-        and bool(stop_update.arrival.time)
+        and stop_update.arrival.HasField("time")
     )
