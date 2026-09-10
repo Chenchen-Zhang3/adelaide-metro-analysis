@@ -1,7 +1,11 @@
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+import logging
 
 from backend.realtime.config import DEFAULT_COLLECTION_SETTINGS
+
+
+logger = logging.getLogger(__name__)
 
 
 class GTFSRealtimeRequestError(RuntimeError):
@@ -31,6 +35,7 @@ class GTFSRealtimeClient:
         self.settings = settings
 
     def fetch(self, url):
+        logger.debug("Requesting GTFS-Realtime feed: %s", url)
         request = Request(
             url,
             headers={
@@ -71,6 +76,7 @@ class GTFSRealtimeClient:
                 f"GTFS-Realtime endpoint returned an empty response: {url}"
             )
 
+        logger.info("Retrieved GTFS-Realtime feed (%d bytes): %s", len(data), url)
         return data
 
     def fetch_vehicle_positions(self):
