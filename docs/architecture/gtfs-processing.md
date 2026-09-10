@@ -96,6 +96,19 @@ errors, such as 403, fail immediately rather than repeatedly requesting the
 feed. When the retries for a temporary failure are exhausted, that collection
 cycle is skipped and the scheduled collector proceeds to its next cycle.
 
+### Runtime logging
+
+The realtime pipeline uses Python's standard `logging` module. Each module
+creates a named logger with `logging.getLogger(__name__)`; handler and output
+format configuration remain the responsibility of the application that runs the
+collector.
+
+Collection-cycle start, successful retrieval, processed record counts and cycle
+completion are logged at `INFO`. Temporary retrieval failures and invalid
+entities that are skipped are logged at `WARNING`. Retry exhaustion,
+non-retryable request failures and decode failures are logged at `ERROR`.
+Raw protobuf payloads are never logged.
+
 ### Record validation and missing-data handling
 
 `backend/realtime/validation.py` validates decoded entities before conversion.

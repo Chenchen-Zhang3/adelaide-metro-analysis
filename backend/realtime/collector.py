@@ -1,5 +1,6 @@
 """Scheduled collection for the existing GTFS-Realtime processing pipeline."""
 
+import logging
 from time import sleep
 
 from backend.realtime.client import (
@@ -22,6 +23,9 @@ from backend.services.historical_records import (
     prepare_trip_update_record,
     prepare_vehicle_position_record,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class GTFSRealtimeRetryExhaustedError(RuntimeError):
@@ -62,7 +66,7 @@ class GTFSRealtimeCollector:
 
         return False
 
-    def _fetch_with_retry(self, fetch_feed):
+    def _fetch_with_retry(self, feed_name, fetch_feed):
         """Fetch one feed, waiting between retries for temporary failures."""
         retry_attempt = 0
 
@@ -71,15 +75,33 @@ class GTFSRealtimeCollector:
                 return fetch_feed()
             except GTFSRealtimeRequestError as error:
                 if not self._is_retryable_error(error):
+                    logger.error(
+                        "Failed to retrieve %s feed without retry: %s",
+                        feed_name,
+                        error,
+                    )
                     raise
 
                 if retry_attempt >= self.client.settings.max_retry_attempts:
+                    logger.error(
+                        "Retries exhausted for %s feed after %d retry attempts: %s",
+                        feed_name,
+                        retry_attempt,
+                        error,
+                    )
                     raise GTFSRealtimeRetryExhaustedError(
                         "GTFS-Realtime request failed after "
                         f"{retry_attempt} retry attempts"
                     ) from error
 
                 retry_attempt += 1
+                logger.warning(
+                    "Temporary failure retrieving %s feed; retrying attempt %d/%d: %s",
+                    feed_name,
+                    retry_attempt,
+                    self.client.settings.max_retry_attempts,
+                    error,
+                )
                 self.sleep_function(
                     self.client.settings.retry_delay_seconds
                 )
@@ -87,9 +109,11 @@ class GTFSRealtimeCollector:
     def _convert_vehicle_positions(self, feed):
         """Convert valid vehicle entities without stopping on an invalid one."""
         records = []
+        skipped_entities = 0
 
         for entity in feed.entity:
             if not is_valid_vehicle_position(entity):
+                skipped_entities += 1
                 continue
 
             try:
@@ -99,16 +123,25 @@ class GTFSRealtimeCollector:
                     )
                 )
             except ValueError:
+                skipped_entities += 1
                 continue
 
+        if skipped_entities:
+            logger.warning(
+                "Skipped %d invalid vehicle position entities",
+                skipped_entities,
+            )
+        logger.info("Processed %d vehicle position records", len(records))
         return records
 
     def _convert_trip_updates(self, feed):
         """Convert valid trip entities without stopping on an invalid one."""
         records = []
+        skipped_entities = 0
 
         for entity in feed.entity:
             if not is_valid_trip_update(entity):
+                skipped_entities += 1
                 continue
 
             try:
@@ -120,23 +153,50 @@ class GTFSRealtimeCollector:
                     )
                 )
             except ValueError:
+                skipped_entities += 1
                 continue
 
+        if skipped_entities:
+            logger.warning("Skipped %d invalid trip update entities", skipped_entities)
+        logger.info("Processed %d trip update records", len(records))
         return records
 
     def collect_once(self):
         """Fetch, decode and convert one Vehicle Positions and Trip Updates cycle."""
-        vehicle_feed = decode_feed(
-            self._fetch_with_retry(self.client.fetch_vehicle_positions)
+        logger.info("Starting GTFS-Realtime collection cycle")
+        vehicle_feed = self._decode_feed(
+            "vehicle_positions",
+            self._fetch_with_retry(
+                "vehicle_positions",
+                self.client.fetch_vehicle_positions,
+            ),
         )
-        trip_update_feed = decode_feed(
-            self._fetch_with_retry(self.client.fetch_trip_updates)
+        trip_update_feed = self._decode_feed(
+            "trip_updates",
+            self._fetch_with_retry(
+                "trip_updates",
+                self.client.fetch_trip_updates,
+            ),
         )
 
-        return {
+        result = {
             "vehicle_positions": self._convert_vehicle_positions(vehicle_feed),
             "trip_updates": self._convert_trip_updates(trip_update_feed),
         }
+        logger.info(
+            "Completed GTFS-Realtime collection cycle: %d vehicle position records, %d trip update records",
+            len(result["vehicle_positions"]),
+            len(result["trip_updates"]),
+        )
+        return result
+
+    def _decode_feed(self, feed_name, data):
+        """Decode a feed while retaining its collection context in failures."""
+        try:
+            return decode_feed(data)
+        except (TypeError, ValueError) as error:
+            logger.error("Failed to decode %s feed: %s", feed_name, error)
+            raise
 
     def run(self, max_cycles=None):
         """Run collection cycles, waiting for the configured polling interval.
@@ -151,7 +211,9 @@ class GTFSRealtimeCollector:
             try:
                 results.append(self.collect_once())
             except GTFSRealtimeRetryExhaustedError:
-                pass
+                logger.warning(
+                    "Skipping GTFS-Realtime collection cycle because feed retries were exhausted"
+                )
             completed_cycles += 1
 
             if max_cycles is None or completed_cycles < max_cycles:
