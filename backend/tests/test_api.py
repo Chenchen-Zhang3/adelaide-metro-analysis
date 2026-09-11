@@ -117,3 +117,69 @@ def test_get_routes_from_database(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     assert response.get_json() == [sample_route]
+
+
+def test_get_stop_detail(monkeypatch):
+    sample_stop = {
+        "stop_id": "STOP_001",
+        "stop_name": "Victoria Square",
+        "stop_lat": -34.9296,
+        "stop_lon": 138.5999,
+    }
+
+    monkeypatch.setattr(
+        "backend.api.app.get_stop",
+        lambda stop_id: sample_stop,
+    )
+
+    client = app.test_client()
+    response = client.get("/api/stops/STOP_001")
+
+    assert response.status_code == 200
+    assert response.get_json() == sample_stop
+
+
+def test_get_stop_detail_not_found(monkeypatch):
+    monkeypatch.setattr(
+        "backend.api.app.get_stop",
+        lambda stop_id: None,
+    )
+
+    client = app.test_client()
+    response = client.get("/api/stops/UNKNOWN")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "Stop not found"
+    }
+
+
+def test_get_stop_detail_from_database(monkeypatch, tmp_path):
+    from backend.database import connection
+    from backend.database.models import create_tables
+    from backend.database.repository import insert_stop
+
+    test_database = tmp_path / "test_stop_detail_api.db"
+
+    monkeypatch.setattr(
+        connection,
+        "DATABASE_PATH",
+        test_database,
+    )
+
+    create_tables()
+
+    sample_stop = {
+        "stop_id": "STOP_001",
+        "stop_name": "Victoria Square",
+        "stop_lat": -34.9296,
+        "stop_lon": 138.5999,
+    }
+
+    insert_stop(sample_stop)
+
+    client = app.test_client()
+    response = client.get("/api/stops/STOP_001")
+
+    assert response.status_code == 200
+    assert response.get_json() == sample_stop
