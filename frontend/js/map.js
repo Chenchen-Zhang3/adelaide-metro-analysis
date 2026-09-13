@@ -684,20 +684,24 @@ async function selectStop(stop) {
         }
 
 
-        if (!performanceResponse.ok) {
+const routes =
+    await routeResponse.json();
 
-            throw new Error(
-                "Could not load performance information."
-            );
-        }
+let performance = null;
 
+if (performanceResponse.ok) {
 
-        const routes =
-            await routeResponse.json();
+    performance =
+        await performanceResponse.json();
+}
 
+else if (performanceResponse.status !== 404) {
 
-        const performance =
-            await performanceResponse.json();
+    throw new Error(
+        "Could not load performance information."
+    );
+}
+
 
 
         displayStopInformation(
@@ -789,88 +793,104 @@ function displayStopInformation(
     }
 
 
-    let performanceContent = "";
+   let performanceContent = "";
 
 
-    if (
-        !Array.isArray(performance) ||
-        performance.length === 0
-    ) {
+if (
+    !performance ||
+    performance.total_services === 0
+) {
 
-        performanceContent = `
-            <p class="detail-message">
-                No performance data available for this stop.
-            </p>
-        `;
-    }
+    performanceContent = `
+        <p class="detail-message">
+            No performance data available for this stop.
+        </p>
+    `;
+}
 
-    else {
+else {
 
-        performance.forEach(record => {
-
-            performanceContent += `
-                <div class="performance-item">
-
-                    <div class="performance-row">
-
-                        <span class="performance-label">
-                            Route
-                        </span>
-
-                        <span class="performance-value">
-                            ${record.route_id || "Unavailable"}
-                        </span>
-
-                    </div>
+    const averageDelay =
+        Number(performance.average_delay);
 
 
-                    <div class="performance-row">
-
-                        <span class="performance-label">
-                            Trip
-                        </span>
-
-                        <span class="performance-value">
-                            ${record.trip_id || "Unavailable"}
-                        </span>
-
-                    </div>
+    const averageDelayText =
+        Number.isFinite(averageDelay)
+            ? `${averageDelay.toFixed(1)} min`
+            : "Unavailable";
 
 
-                    <div class="performance-row">
+    performanceContent = `
+        <div class="performance-item">
 
-                        <span class="performance-label">
-                            Scheduled
-                        </span>
+            <div class="performance-row">
+                <span class="performance-label">
+                    Total services
+                </span>
 
-                        <span class="performance-value">
-                            ${formatArrivalTime(record.scheduled_arrival)}
-                        </span>
-
-                    </div>
-
-
-                    <div class="performance-row">
-
-                        <span class="performance-label">
-                            Actual
-                        </span>
-
-                        <span class="performance-value">
-                            ${formatArrivalTime(record.actual_arrival)}
-                        </span>
-
-                    </div>
+                <span class="performance-value">
+                    ${performance.total_services}
+                </span>
+            </div>
 
 
-                    <span class="delay-status">
-                        ${formatDelay(record.delay_seconds)}
-                    </span>
+            <div class="performance-row">
+                <span class="performance-label">
+                    Average delay
+                </span>
 
-                </div>
-            `;
-        });
-    }
+                <span class="performance-value">
+                    ${averageDelayText}
+                </span>
+            </div>
+
+
+            <div class="performance-row">
+                <span class="performance-label">
+                    Early
+                </span>
+
+                <span class="performance-value">
+                    ${performance.early_count}
+                </span>
+            </div>
+
+
+            <div class="performance-row">
+                <span class="performance-label">
+                    On time
+                </span>
+
+                <span class="performance-value">
+                    ${performance.on_time_count}
+                </span>
+            </div>
+
+
+            <div class="performance-row">
+                <span class="performance-label">
+                    Delayed
+                </span>
+
+                <span class="performance-value">
+                    ${performance.delayed_count}
+                </span>
+            </div>
+
+
+            <div class="performance-row">
+                <span class="performance-label">
+                    Severely delayed
+                </span>
+
+                <span class="performance-value">
+                    ${performance.severely_delayed_count}
+                </span>
+            </div>
+
+        </div>
+    `;
+}
 
 
     selectedStopInfo.innerHTML = `
