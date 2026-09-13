@@ -7,6 +7,7 @@ from backend.database.repository import (
     get_all_stops,
     get_stop,
 )
+from backend.services.pipeline import query_and_analyse
 
 
 app = Flask(__name__)
@@ -40,3 +41,17 @@ def get_stop_detail(stop_id):
         return jsonify({"error": "Stop not found"}), 404
 
     return jsonify(stop)
+
+
+@app.get("/api/routes/<route_id>/performance")
+def get_route_performance(route_id):
+    """Return performance data for one route."""
+
+    analysis = query_and_analyse(route_id=route_id)
+
+    performance = analysis["route_performance"].get(route_id)
+
+    if performance is None:
+        return jsonify({"error": "Route performance not found"}), 404
+
+    return jsonify(performance)
