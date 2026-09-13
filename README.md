@@ -4,9 +4,10 @@ This repository contains the prototype developed for the Adelaide Metro Real-Tim
 
 The project is being developed for CASR researchers to support the collection, storage, exploration and analysis of Adelaide Metro GTFS and GTFS-Realtime data.
 
-## Sprint 1 Status
+## Sprint 1 and Sprint 2 Status
 
-Sprint 1 focused on establishing the technical foundation of the project.
+Sprint 1 established the technical foundation. Sprint 2 adds a reusable
+GTFS-Realtime ingestion and processing workflow.
 
 The current prototype includes:
 
@@ -20,6 +21,10 @@ The current prototype includes:
 - Sample data validation
 - Backend unit testing
 - Database and analysis integration testing
+- Configurable GTFS-Realtime collection settings
+- Scheduled Vehicle Position and Trip Update collection with bounded retry
+- Record validation, database-ready historical mapping and delay handling
+- Standard logging and a reusable realtime processing pipeline
 
 ## Project Structure
 
@@ -103,13 +108,20 @@ The validation checks the sample datasets against the shared schemas and also ch
 
 ## Backend Tests
 
-Run the Sprint 1 backend tests using:
+Run the original Sprint 1 backend tests using:
 
 ```bash
 python -m unittest backend.tests.test_static_gtfs backend.tests.test_realtime_client backend.tests.test_realtime_decoder backend.tests.test_gtfs_converter -v
 ```
 
-The current backend test suite contains 22 tests.
+Sprint 2 realtime processing tests and the database handoff contract are
+documented in [GTFS Processing and Database Handoff](docs/architecture/gtfs-processing.md).
+
+Run full backend test discovery with:
+
+```bash
+python -m unittest discover -s backend/tests -p "test_*.py" -v
+```
 
 ## Database Test
 
@@ -157,12 +169,13 @@ The current frontend can display the sample CBD stops using the shared stop stru
 
 ## Current Limitations
 
-The Sprint 1 prototype is an initial technical foundation and is not the final system.
+The current prototype is an initial technical foundation and is not the final system.
 
 Current limitations include:
 
-- Continuous historical GTFS-Realtime collection is not yet implemented
-- More complete database querying will be developed in later sprints
+- A deployment host is still required to run continuous GTFS-Realtime collection
+- Service Alerts do not yet have a historical persistence contract
+- Production monitoring and alerting are not yet configured
 - More detailed delay and route analysis will be added later
 - The current nearby-stop prototype uses straight-line distance
 - Road-network distance is not yet implemented

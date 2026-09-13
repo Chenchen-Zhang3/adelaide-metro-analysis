@@ -12,7 +12,6 @@ from backend.database.repository import (
 
 app = Flask(__name__)
 
-# Allow the frontend to access this API while running on a different port
 CORS(app)
 
 

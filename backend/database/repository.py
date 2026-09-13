@@ -214,6 +214,25 @@ def get_all_stops():
 
     return [dict(row) for row in rows]
 
+def get_all_routes():
+    """Return all routes from the database."""
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT route_id, route_short_name, route_long_name, route_type
+        FROM routes
+        ORDER BY route_short_name, route_id
+        """
+    )
+
+    rows = cursor.fetchall()
+    connection.close()
+
+    return [dict(row) for row in rows]
+
 
 def get_trip_updates(route_id):
     connection = get_connection()
