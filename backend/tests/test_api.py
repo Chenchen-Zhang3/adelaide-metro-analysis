@@ -385,3 +385,33 @@ def test_get_stop_performance_from_database(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert result["total_services"] == 2
     assert result["average_delay"] == 8.5
+
+
+def test_database_error(monkeypatch):
+    import sqlite3
+
+    def raise_database_error():
+        raise sqlite3.DatabaseError("Test database error")
+
+    monkeypatch.setattr(
+        "backend.api.app.get_all_stops",
+        raise_database_error,
+    )
+
+    client = app.test_client()
+    response = client.get("/api/stops")
+
+    assert response.status_code == 500
+    assert response.get_json() == {
+        "error": "Database error"
+    }
+
+
+def test_unknown_endpoint():
+    client = app.test_client()
+    response = client.get("/api/unknown")
+
+    assert response.status_code == 404
+    assert response.get_json() == {
+        "error": "Endpoint not found"
+    }
