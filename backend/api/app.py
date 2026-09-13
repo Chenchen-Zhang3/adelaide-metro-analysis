@@ -55,3 +55,17 @@ def get_route_performance(route_id):
         return jsonify({"error": "Route performance not found"}), 404
 
     return jsonify(performance)
+
+
+@app.get("/api/stops/<stop_id>/performance")
+def get_stop_performance(stop_id):
+    """Return performance data for one stop."""
+
+    analysis = query_and_analyse(stop_id=stop_id)
+
+    performance = analysis["stop_performance"].get(stop_id)
+
+    if performance is None:
+        return jsonify({"error": "Stop performance not found"}), 404
+
+    return jsonify(performance)
