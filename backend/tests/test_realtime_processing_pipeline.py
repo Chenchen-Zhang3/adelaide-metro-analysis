@@ -1,8 +1,16 @@
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import MagicMock
 
 from google.transit import gtfs_realtime_pb2
 
+import backend.database.connection as database_connection
+from backend.database.models import create_tables
+from backend.database.repository import (
+    insert_trip_update,
+    insert_vehicle_position,
+)
 from backend.realtime.client import GTFSRealtimeConnectionError
 from backend.realtime.config import GTFSRealtimeCollectionSettings
 from backend.realtime.pipeline import GTFSRealtimeProcessingPipeline
@@ -62,15 +70,39 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
 
         return feed.SerializeToString()
 
+    def create_mixed_trip_update_feed_bytes(self):
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.header.gtfs_realtime_version = "1.0"
+
+        for trip_id, route_id in (("1090314", "721"), ("1090315", "722")):
+            entity = feed.entity.add()
+            entity.id = f"trip-update-{trip_id}"
+            trip_update = entity.trip_update
+            trip_update.trip.trip_id = trip_id
+            trip_update.trip.route_id = route_id
+            trip_update.trip.start_date = "20260829"
+            stop_update = trip_update.stop_time_update.add()
+            stop_update.stop_id = "5281"
+            stop_update.stop_sequence = 38
+            stop_update.arrival.time = 1788017632
+
+        invalid_entity = feed.entity.add()
+        invalid_entity.id = "invalid-trip-update"
+        invalid_entity.trip_update.trip.trip_id = "missing-route"
+        invalid_entity.trip_update.trip.start_date = "20260829"
+
+        return feed.SerializeToString()
+
     def create_empty_feed_bytes(self):
         feed = gtfs_realtime_pb2.FeedMessage()
         feed.header.gtfs_realtime_version = "1.0"
         return feed.SerializeToString()
 
-    def make_client(self, retry_delay_seconds=5):
+    def make_client(self, retry_delay_seconds=5, max_retry_attempts=2):
         client = MagicMock()
         client.settings = GTFSRealtimeCollectionSettings(
             retry_delay_seconds=retry_delay_seconds,
+            max_retry_attempts=max_retry_attempts,
         )
         client.fetch_vehicle_positions.return_value = self.create_vehicle_feed_bytes()
         client.fetch_trip_updates.return_value = self.create_trip_update_feed_bytes()
@@ -146,6 +178,99 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
         self.assertEqual(client.fetch_vehicle_positions.call_count, 2)
         sleep_function.assert_called_once_with(3)
         self.assertEqual(result["vehicle_positions"][0]["vehicle_id"], "2606")
+
+    def test_process_once_succeeds_after_multiple_temporary_failures(self):
+        client = self.make_client(retry_delay_seconds=2)
+        client.fetch_vehicle_positions.side_effect = [
+            GTFSRealtimeConnectionError("First temporary failure"),
+            GTFSRealtimeConnectionError("Second temporary failure"),
+            self.create_vehicle_feed_bytes(),
+        ]
+        sleep_function = MagicMock()
+        pipeline = GTFSRealtimeProcessingPipeline(
+            client=client,
+            sleep_function=sleep_function,
+        )
+
+        result = pipeline.process_once()
+
+        self.assertEqual(client.fetch_vehicle_positions.call_count, 3)
+        self.assertEqual(sleep_function.call_count, 2)
+        sleep_function.assert_called_with(2)
+        self.assertEqual(result["vehicle_positions"][0]["vehicle_id"], "2606")
+
+    def test_process_once_skips_invalid_trip_update_and_keeps_valid_records(self):
+        client = self.make_client()
+        client.fetch_trip_updates.return_value = self.create_mixed_trip_update_feed_bytes()
+        pipeline = GTFSRealtimeProcessingPipeline(
+            client=client,
+            stop_time_index={
+                ("1090314", "5281", 38): {"arrival_time": "24:56:02"},
+                ("1090315", "5281", 38): {"arrival_time": "24:56:02"},
+            },
+        )
+
+        result = pipeline.process_once()
+
+        self.assertEqual(
+            [record["trip_id"] for record in result["trip_updates"]],
+            ["1090314", "1090315"],
+        )
+
+    def test_process_once_emits_collection_summary_log(self):
+        pipeline = GTFSRealtimeProcessingPipeline(
+            client=self.make_client(),
+            stop_time_index={
+                ("1090314", "5281", 38): {"arrival_time": "24:56:02"},
+            },
+        )
+
+        with self.assertLogs("backend.realtime.collector", level="INFO") as logs:
+            pipeline.process_once()
+
+        output = "\n".join(logs.output)
+        self.assertIn("Starting GTFS-Realtime collection cycle", output)
+        self.assertIn("Processed 1 vehicle position records", output)
+        self.assertIn("Completed GTFS-Realtime collection cycle", output)
+
+    def test_pipeline_output_is_accepted_by_database_repository(self):
+        temporary_directory = tempfile.TemporaryDirectory()
+        original_database_path = database_connection.DATABASE_PATH
+        database_connection.DATABASE_PATH = (
+            Path(temporary_directory.name) / "test_adelaide_metro.db"
+        )
+
+        try:
+            create_tables()
+            pipeline = GTFSRealtimeProcessingPipeline(
+                client=self.make_client(),
+                stop_time_index={
+                    ("1090314", "5281", 38): {"arrival_time": "24:56:02"},
+                },
+            )
+
+            result = pipeline.process_once()
+            insert_vehicle_position(result["vehicle_positions"][0])
+            insert_trip_update(result["trip_updates"][0])
+
+            connection = database_connection.get_connection()
+            try:
+                cursor = connection.cursor()
+                cursor.execute("SELECT vehicle_id FROM vehicle_positions")
+                vehicle = dict(cursor.fetchone())
+                cursor.execute(
+                    "SELECT trip_id, delay_seconds FROM trip_updates"
+                )
+                trip_update = dict(cursor.fetchone())
+            finally:
+                connection.close()
+
+            self.assertEqual(vehicle["vehicle_id"], "2606")
+            self.assertEqual(trip_update["trip_id"], "1090314")
+            self.assertEqual(trip_update["delay_seconds"], 470)
+        finally:
+            database_connection.DATABASE_PATH = original_database_path
+            temporary_directory.cleanup()
 
 
 if __name__ == "__main__":
