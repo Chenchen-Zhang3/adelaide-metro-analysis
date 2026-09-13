@@ -405,3 +405,87 @@ def get_routes_by_stop(stop_id):
     connection.close()
 
     return [dict(row) for row in rows]
+
+def get_vehicle_positions_filtered(
+    vehicle_id=None,
+    route_id=None,
+    start_time=None,
+    end_time=None,
+):
+    # Validate the start timestamp.
+    start_datetime = None
+    if start_time is not None:
+        start_datetime = datetime.fromisoformat(start_time)
+
+    # Validate the end timestamp.
+    end_datetime = None
+    if end_time is not None:
+        end_datetime = datetime.fromisoformat(end_time)
+
+    # Check that the time range is valid.
+    if (
+        start_datetime is not None
+        and end_datetime is not None
+        and start_datetime > end_datetime
+    ):
+        raise ValueError("start_time must be before or equal to end_time")
+
+    # Store query conditions.
+    conditions = []
+
+    # Store query parameters.
+    parameters = []
+
+    # Add the vehicle filter.
+    if vehicle_id is not None:
+        conditions.append("vehicle_id = ?")
+        parameters.append(vehicle_id)
+
+    # Add the route filter.
+    if route_id is not None:
+        conditions.append("route_id = ?")
+        parameters.append(route_id)
+
+    # Add the start time filter.
+    if start_time is not None:
+        conditions.append("timestamp IS NOT NULL")
+        conditions.append("timestamp >= ?")
+        parameters.append(start_time)
+
+    # Add the end time filter.
+    if end_time is not None:
+        if "timestamp IS NOT NULL" not in conditions:
+            conditions.append("timestamp IS NOT NULL")
+
+        conditions.append("timestamp <= ?")
+        parameters.append(end_time)
+
+    # Start the vehicle position query.
+    query = "SELECT * FROM vehicle_positions"
+
+    # Add filters when provided.
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    # Return records in historical order.
+    query += """
+        ORDER BY
+            CASE WHEN timestamp IS NULL THEN 1 ELSE 0 END,
+            timestamp
+    """
+
+    # Open the database connection.
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    # Run the vehicle position query.
+    cursor.execute(query, parameters)
+
+    # Get all matching records.
+    rows = cursor.fetchall()
+
+    # Close the database connection.
+    connection.close()
+
+    # Return records as dictionaries.
+    return [dict(row) for row in rows]

@@ -18,6 +18,7 @@ from backend.database.repository import (
     get_trip_updates_by_stop,
     get_trip_updates_by_time_range,
     get_trip_updates_filtered,
+    get_vehicle_positions_filtered,
 )
 
 
@@ -518,3 +519,88 @@ def test_invalid_time_range_raises_error():
             start_time,
             end_time,
         )
+        
+def test_vehicle_position_query_by_vehicle():
+    # Load the shared vehicle fixture.
+    vehicles = load_fixture("sample_vehicles.json")
+
+    # Insert all vehicle records.
+    for vehicle in vehicles:
+        insert_vehicle_position(vehicle)
+
+    # Query the first vehicle.
+    results = get_vehicle_positions_filtered(
+        vehicle_id=vehicles[0]["vehicle_id"]
+    )
+
+    # Check that only the selected vehicle is returned.
+    assert len(results) == 1
+    assert results[0]["vehicle_id"] == vehicles[0]["vehicle_id"]
+
+
+def test_vehicle_position_query_by_route():
+    # Load the shared vehicle fixture.
+    vehicles = load_fixture("sample_vehicles.json")
+
+    # Insert all vehicle records.
+    for vehicle in vehicles:
+        insert_vehicle_position(vehicle)
+
+    # Query the first vehicle route.
+    results = get_vehicle_positions_filtered(
+        route_id=vehicles[0]["route_id"]
+    )
+
+    # Check that only the selected route is returned.
+    assert len(results) == 1
+    assert results[0]["route_id"] == vehicles[0]["route_id"]
+
+
+def test_vehicle_position_query_by_time_range():
+    # Load the shared vehicle fixture.
+    vehicles = load_fixture("sample_vehicles.json")
+
+    # Insert all vehicle records.
+    for vehicle in vehicles:
+        insert_vehicle_position(vehicle)
+
+    # Use the first vehicle timestamp.
+    timestamp = vehicles[0]["timestamp"]
+
+    # Query the selected time.
+    results = get_vehicle_positions_filtered(
+        start_time=timestamp,
+        end_time=timestamp,
+    )
+
+    # Check that only the matching record is returned.
+    assert len(results) == 1
+    assert results[0]["vehicle_id"] == vehicles[0]["vehicle_id"]
+    assert results[0]["timestamp"] == timestamp
+
+
+def test_vehicle_position_combined_filters():
+    # Load the shared vehicle fixture.
+    vehicles = load_fixture("sample_vehicles.json")
+
+    # Insert all vehicle records.
+    for vehicle in vehicles:
+        insert_vehicle_position(vehicle)
+
+    # Select the first vehicle record.
+    target_vehicle = vehicles[0]
+
+    # Query vehicle, route and time together.
+    results = get_vehicle_positions_filtered(
+        vehicle_id=target_vehicle["vehicle_id"],
+        route_id=target_vehicle["route_id"],
+        start_time=target_vehicle["timestamp"],
+        end_time=target_vehicle["timestamp"],
+    )
+
+    # Check that only the target record is returned.
+    assert len(results) == 1
+    assert results[0]["vehicle_id"] == target_vehicle["vehicle_id"]
+    assert results[0]["route_id"] == target_vehicle["route_id"]
+    assert results[0]["latitude"] == target_vehicle["latitude"]
+    assert results[0]["longitude"] == target_vehicle["longitude"]

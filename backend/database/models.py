@@ -106,7 +106,7 @@ def create_tables():
         ON trip_updates (timestamp)
     """)
 
-    # Create an index for combined filters.
+    # Create an index for combined trip update filters.
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_trip_updates_filters
         ON trip_updates (
@@ -139,6 +139,34 @@ def create_tables():
             latitude,
             longitude,
             IFNULL(timestamp, '')
+        )
+    """)
+
+    # Create an index for vehicle queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_vehicle_positions_vehicle
+        ON vehicle_positions (vehicle_id)
+    """)
+
+    # Create an index for vehicle route queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_vehicle_positions_route
+        ON vehicle_positions (route_id)
+    """)
+
+    # Create an index for vehicle time queries.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_vehicle_positions_timestamp
+        ON vehicle_positions (timestamp)
+    """)
+
+    # Create an index for combined vehicle filters.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_vehicle_positions_filters
+        ON vehicle_positions (
+            vehicle_id,
+            route_id,
+            timestamp
         )
     """)
 
