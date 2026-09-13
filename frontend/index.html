@@ -1,48 +1,262 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Adelaide Metro Transport Analysis</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  />
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Adelaide Metro Transport Analysis</title>
+
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
 </head>
 
 <body>
 
-  <header>
-    <h1>Adelaide Metro Real-Time Transport Analysis</h1>
-    <p>Explore bus stops and transport information across Adelaide.</p>
-  </header>
+    <header class="page-header">
 
-  <main>
+        <div>
+            <h1>
+                Adelaide Metro Real-Time Transport Analysis
+            </h1>
 
-    <aside>
-      <h2>Transport Explorer</h2>
-
-      <section>
-        <h3>Location A</h3>
-        <button id="locationButton">Use My Location</button>
-      </section>
-
-      <section>
-        <h3>Nearby Stops</h3>
-        <div id="nearbyStops">
-          <p>No location selected yet.</p>
+            <p>
+                Explore Adelaide Metro stops, accessibility and transport information.
+            </p>
         </div>
-      </section>
-    </aside>
 
-    <section>
-      <h2>Adelaide Map</h2>
-      <div id="map"></div>
-    </section>
+    </header>
 
-  </main>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="js/map.js"></script>
+
+    <main class="app-layout">
+
+        <aside class="sidebar">
+
+            <div class="sidebar-heading">
+
+                <h2>
+                    Transport Explorer
+                </h2>
+
+                <p>
+                    Choose your current location or select a point directly on the map.
+                </p>
+
+            </div>
+
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">
+                        1
+                    </span>
+
+                    <div>
+                        <h3>
+                            Select Location
+                        </h3>
+
+                        <p>
+                            Set Location A for nearby-stop calculations.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <button id="locationButton">
+                    Use My Location
+                </button>
+
+
+                <p class="map-instruction">
+                    Or click anywhere on the map to select a location.
+                </p>
+
+            </section>
+
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">
+                        2
+                    </span>
+
+                    <div>
+                        <h3>
+                            Selected Location
+                        </h3>
+
+                        <p>
+                            Coordinates currently used for analysis.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="selectedLocationInfo"
+                    class="info-card empty-card"
+                >
+
+                    <p>
+                        No location selected yet.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">
+                        3
+                    </span>
+
+                    <div>
+                        <h3>
+                            Nearest Stop
+                        </h3>
+
+                        <p>
+                            Closest available Adelaide Metro stop.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="nearestStop"
+                    class="info-card empty-card"
+                >
+
+                    <p>
+                        Select a location to find the nearest stop.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <section class="sidebar-section">
+
+                <h3 class="simple-section-heading">
+                    Other Nearby Stops
+                </h3>
+
+
+                <div
+                    id="nearbyStops"
+                    class="nearby-stops-card"
+                >
+
+                    <p>
+                        No location selected yet.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">
+                        4
+                    </span>
+
+                    <div>
+                        <h3>
+                            Selected Stop
+                        </h3>
+
+                        <p>
+                            Routes and available performance information.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="selectedStopInfo"
+                    class="info-card empty-card"
+                >
+
+                    <p>
+                        Select a stop to view transport information.
+                    </p>
+
+                </div>
+
+            </section>
+
+        </aside>
+
+
+        <section class="map-section">
+
+            <div class="map-heading">
+
+                <div>
+
+                    <h2>
+                        Adelaide Map
+                    </h2>
+
+                    <p>
+                        Select a stop marker for details or click the map to choose Location A.
+                    </p>
+
+                </div>
+
+
+                <div
+                    id="stopCount"
+                    class="stop-count"
+                >
+                    Loading stops...
+                </div>
+
+            </div>
+
+
+            <div id="map"></div>
+
+        </section>
+
+    </main>
+
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    ></script>
+
+    <script src="js/map.js"></script>
+
 </body>
+
 </html>
