@@ -4,11 +4,9 @@ from backend.database.connection import get_connection
 
 
 def insert_route(route):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert or update a route record.
     cursor.execute(
         """
         INSERT OR REPLACE INTO routes (
@@ -27,17 +25,14 @@ def insert_route(route):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def insert_stop(stop):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert or update a stop record.
     cursor.execute(
         """
         INSERT OR REPLACE INTO stops (
@@ -56,17 +51,14 @@ def insert_stop(stop):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def insert_trip(trip):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert or update a trip record.
     cursor.execute(
         """
         INSERT OR REPLACE INTO trips (
@@ -87,17 +79,14 @@ def insert_trip(trip):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def insert_stop_time(stop_time):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert the record and ignore duplicates.
     cursor.execute(
         """
         INSERT OR IGNORE INTO stop_times (
@@ -118,17 +107,14 @@ def insert_stop_time(stop_time):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def insert_trip_update(trip_update):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert the record with an optional timestamp.
     cursor.execute(
         """
         INSERT OR IGNORE INTO trip_updates (
@@ -153,17 +139,14 @@ def insert_trip_update(trip_update):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def insert_vehicle_position(vehicle):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Insert the record with an optional timestamp.
     cursor.execute(
         """
         INSERT OR IGNORE INTO vehicle_positions (
@@ -186,17 +169,14 @@ def insert_vehicle_position(vehicle):
         ),
     )
 
-    # Save and close the connection.
     connection.commit()
     connection.close()
 
 
 def get_stop(stop_id):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Find a stop by its ID.
     cursor.execute(
         """
         SELECT *
@@ -206,18 +186,14 @@ def get_stop(stop_id):
         (stop_id,),
     )
 
-    # Get the matching record.
     row = cursor.fetchone()
-
-    # Close the database connection.
     connection.close()
 
-    # Return None if no record exists.
     if row is None:
         return None
 
-    # Return the record as a dictionary.
     return dict(row)
+
 
 def get_all_stops():
     """Return all stops from the database."""
@@ -240,11 +216,9 @@ def get_all_stops():
 
 
 def get_trip_updates(route_id):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Find trip updates for the selected route.
     cursor.execute(
         """
         SELECT *
@@ -257,22 +231,16 @@ def get_trip_updates(route_id):
         (route_id,),
     )
 
-    # Get all matching records.
     rows = cursor.fetchall()
-
-    # Close the database connection.
     connection.close()
 
-    # Return records as dictionaries.
     return [dict(row) for row in rows]
 
 
 def get_trip_updates_by_stop(stop_id):
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Find trip updates for the selected stop.
     cursor.execute(
         """
         SELECT *
@@ -285,30 +253,22 @@ def get_trip_updates_by_stop(stop_id):
         (stop_id,),
     )
 
-    # Get all matching records.
     rows = cursor.fetchall()
-
-    # Close the database connection.
     connection.close()
 
-    # Return records as dictionaries.
     return [dict(row) for row in rows]
 
 
 def get_trip_updates_by_time_range(start_time, end_time):
-    # Convert timestamps for validation.
     start_datetime = datetime.fromisoformat(start_time)
     end_datetime = datetime.fromisoformat(end_time)
 
-    # Check that the time range is valid.
     if start_datetime > end_datetime:
         raise ValueError("start_time must be before or equal to end_time")
 
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Find records inside the time range.
     cursor.execute(
         """
         SELECT *
@@ -324,13 +284,9 @@ def get_trip_updates_by_time_range(start_time, end_time):
         ),
     )
 
-    # Get all matching records.
     rows = cursor.fetchall()
-
-    # Close the database connection.
     connection.close()
 
-    # Return records as dictionaries.
     return [dict(row) for row in rows]
 
 
@@ -340,17 +296,14 @@ def get_trip_updates_filtered(
     start_time=None,
     end_time=None,
 ):
-    # Validate the start timestamp.
     start_datetime = None
     if start_time is not None:
         start_datetime = datetime.fromisoformat(start_time)
 
-    # Validate the end timestamp.
     end_datetime = None
     if end_time is not None:
         end_datetime = datetime.fromisoformat(end_time)
 
-    # Check that the time range is valid.
     if (
         start_datetime is not None
         and end_datetime is not None
@@ -358,29 +311,22 @@ def get_trip_updates_filtered(
     ):
         raise ValueError("start_time must be before or equal to end_time")
 
-    # Store SQL filter conditions.
     conditions = []
-
-    # Store SQL parameter values.
     parameters = []
 
-    # Add the route filter.
     if route_id is not None:
         conditions.append("route_id = ?")
         parameters.append(route_id)
 
-    # Add the stop filter.
     if stop_id is not None:
         conditions.append("stop_id = ?")
         parameters.append(stop_id)
 
-    # Add the start time filter.
     if start_time is not None:
         conditions.append("timestamp IS NOT NULL")
         conditions.append("timestamp >= ?")
         parameters.append(start_time)
 
-    # Add the end time filter.
     if end_time is not None:
         if "timestamp IS NOT NULL" not in conditions:
             conditions.append("timestamp IS NOT NULL")
@@ -388,32 +334,55 @@ def get_trip_updates_filtered(
         conditions.append("timestamp <= ?")
         parameters.append(end_time)
 
-    # Start the database query.
     query = "SELECT * FROM trip_updates"
 
-    # Add filters when they are provided.
     if conditions:
         query += " WHERE " + " AND ".join(conditions)
 
-    # Sort timestamped records first.
     query += """
         ORDER BY
             CASE WHEN timestamp IS NULL THEN 1 ELSE 0 END,
             timestamp
     """
 
-    # Open the database connection.
     connection = get_connection()
     cursor = connection.cursor()
 
-    # Run the combined query.
     cursor.execute(query, parameters)
 
-    # Get all matching records.
     rows = cursor.fetchall()
-
-    # Close the database connection.
     connection.close()
 
-    # Return records as dictionaries.
+    return [dict(row) for row in rows]
+
+
+def get_routes_by_stop(stop_id):
+    """Return all distinct routes that serve the selected stop."""
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """
+        SELECT DISTINCT
+            routes.route_id,
+            routes.route_short_name,
+            routes.route_long_name,
+            routes.route_type
+        FROM routes
+        INNER JOIN trips
+            ON routes.route_id = trips.route_id
+        INNER JOIN stop_times
+            ON trips.trip_id = stop_times.trip_id
+        WHERE stop_times.stop_id = ?
+        ORDER BY
+            routes.route_short_name,
+            routes.route_long_name
+        """,
+        (stop_id,),
+    )
+
+    rows = cursor.fetchall()
+    connection.close()
+
     return [dict(row) for row in rows]
