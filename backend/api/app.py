@@ -1,5 +1,7 @@
 """Backend API for Adelaide Metro data."""
 
+import sqlite3
+
 from flask import Flask, jsonify
 
 from backend.database.repository import (
@@ -11,6 +13,20 @@ from backend.services.pipeline import query_and_analyse
 
 
 app = Flask(__name__)
+
+@app.errorhandler(sqlite3.Error)
+def handle_database_error(error):
+    """Return a JSON response for database errors."""
+
+    return jsonify({"error": "Database error"}), 500
+
+
+@app.errorhandler(404)
+def handle_not_found(error):
+    """Return a JSON response for unknown API routes."""
+
+    return jsonify({"error": "Endpoint not found"}), 404
+
 
 
 @app.get("/api/stops")
