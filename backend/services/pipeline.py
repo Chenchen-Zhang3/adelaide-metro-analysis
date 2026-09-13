@@ -1,6 +1,5 @@
-"""Connect GTFS-Realtime collection results to the database."""
-
 from datetime import datetime
+from time import sleep
 
 from backend.analysis.aggregation import prepare_analysis_output
 from backend.database.repository import (
@@ -8,19 +7,24 @@ from backend.database.repository import (
     insert_trip_update,
     insert_vehicle_position,
 )
+from backend.realtime.collector import (
+    GTFSRealtimeRetryExhaustedError,
+)
 
 
 def persist_collection_result(collection_result):
     """Store collected realtime records in the database."""
 
+    # Get collected vehicle positions.
     vehicle_positions = collection_result.get(
         "vehicle_positions",
-        []
+        [],
     )
 
+    # Get collected trip updates.
     trip_updates = collection_result.get(
         "trip_updates",
-        []
+        [],
     )
 
     # Store vehicle position records.
@@ -31,6 +35,7 @@ def persist_collection_result(collection_result):
     for trip_update in trip_updates:
         insert_trip_update(trip_update)
 
+    # Return the processed record counts.
     return {
         "vehicle_positions_processed": len(vehicle_positions),
         "trip_updates_processed": len(trip_updates),
@@ -38,7 +43,7 @@ def persist_collection_result(collection_result):
 
 
 def collect_and_persist(collector):
-    """Collect realtime data and store it in the database."""
+    """Collect one realtime cycle and store it."""
 
     # Collect one cycle of realtime data.
     collection_result = collector.collect_once()
@@ -48,20 +53,67 @@ def collect_and_persist(collector):
         collection_result
     )
 
+    # Return collection and persistence results.
     return {
         "collection_result": collection_result,
         "persistence_result": persistence_result,
     }
 
 
+def run_collection_and_persist(
+    collector,
+    max_cycles=None,
+    sleep_function=sleep,
+):
+    """Continuously collect and store realtime data."""
+
+    # Reject an invalid cycle limit.
+    if max_cycles is not None and max_cycles < 0:
+        raise ValueError("max_cycles cannot be negative")
+
+    # Track completed collection cycles.
+    completed_cycles = 0
+
+    # Store successful cycle results.
+    results = []
+
+    # Run until stopped or the cycle limit is reached.
+    while max_cycles is None or completed_cycles < max_cycles:
+        try:
+            # Collect and persist one cycle.
+            result = collect_and_persist(collector)
+
+            # Keep the successful cycle result.
+            results.append(result)
+
+        except GTFSRealtimeRetryExhaustedError:
+            # Skip a cycle when temporary retries fail.
+            pass
+
+        # Mark the cycle as completed.
+        completed_cycles += 1
+
+        # Wait before the next collection cycle.
+        if max_cycles is None or completed_cycles < max_cycles:
+            sleep_function(
+                collector.client.settings.polling_interval_seconds
+            )
+
+    # Return all successful cycle results.
+    return results
+
+
 def prepare_analysis_records(records):
     """Prepare database records for delay analysis."""
 
+    # Store analysis-ready records.
     analysis_records = []
 
     for record in records:
+        # Read the record timestamp.
         timestamp = record.get("timestamp")
 
+        # Determine the time period.
         if timestamp:
             hour = datetime.fromisoformat(timestamp).hour
 
@@ -74,6 +126,7 @@ def prepare_analysis_records(records):
         else:
             time_period = "Unknown"
 
+        # Add the analysis record.
         analysis_records.append({
             "route_id": record["route_id"],
             "stop_id": record["stop_id"],
@@ -81,6 +134,7 @@ def prepare_analysis_records(records):
             "time_period": time_period,
         })
 
+    # Return analysis-ready records.
     return analysis_records
 
 
@@ -92,6 +146,7 @@ def query_and_analyse(
 ):
     """Query stored records and prepare delay analysis."""
 
+    # Query matching historical records.
     records = get_trip_updates_filtered(
         route_id=route_id,
         stop_id=stop_id,
@@ -99,6 +154,8 @@ def query_and_analyse(
         end_time=end_time,
     )
 
+    # Prepare records for analysis.
     analysis_records = prepare_analysis_records(records)
 
+    # Return aggregated analysis results.
     return prepare_analysis_output(analysis_records)
