@@ -14,15 +14,14 @@ def delayed_service_count(delays, threshold=5):
     return sum(delay > threshold for delay in delays)
 
 
-def delay_frequency(delays, threshold=5):
-    """Return the percentage of services that are delayed."""
+def delayed_rate(delays):
+    """Return percentage of delayed services (>5 and <=10 minutes)."""
     if not delays:
         return 0.0
 
-    delayed = delayed_service_count(delays, threshold)
+    delayed = sum(5 < delay <= 10 for delay in delays)
 
     return (delayed / len(delays)) * 100
-
 
 def on_time_rate(delays, threshold=5):
     """Return the percentage of services that are on time."""
