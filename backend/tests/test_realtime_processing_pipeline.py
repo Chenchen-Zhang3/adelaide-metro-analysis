@@ -14,6 +14,7 @@ from backend.database.repository import (
 from backend.realtime.client import GTFSRealtimeConnectionError
 from backend.realtime.config import GTFSRealtimeCollectionSettings
 from backend.realtime.pipeline import GTFSRealtimeProcessingPipeline
+from backend.services.pipeline import persist_collection_result
 
 
 class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
@@ -268,6 +269,88 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
             self.assertEqual(vehicle["vehicle_id"], "2606")
             self.assertEqual(trip_update["trip_id"], "1090314")
             self.assertEqual(trip_update["delay_seconds"], 470)
+        finally:
+            database_connection.DATABASE_PATH = original_database_path
+            temporary_directory.cleanup()
+
+    def test_process_once_output_persists_through_service_handover(self):
+        """Verify the processor-to-persistence handover with a temporary DB."""
+        temporary_directory = tempfile.TemporaryDirectory()
+        original_database_path = database_connection.DATABASE_PATH
+        database_connection.DATABASE_PATH = (
+            Path(temporary_directory.name) / "test_adelaide_metro.db"
+        )
+
+        try:
+            create_tables()
+            processing_pipeline = GTFSRealtimeProcessingPipeline(
+                client=self.make_client(),
+                stop_time_index={
+                    ("1090314", "5281", 38): {"arrival_time": "24:56:02"},
+                },
+            )
+
+            collection_result = processing_pipeline.process_once()
+
+            self.assertEqual(
+                set(collection_result["vehicle_positions"][0]),
+                {
+                    "vehicle_id",
+                    "trip_id",
+                    "route_id",
+                    "latitude",
+                    "longitude",
+                    "timestamp",
+                },
+            )
+            self.assertEqual(
+                set(collection_result["trip_updates"][0]),
+                {
+                    "trip_id",
+                    "route_id",
+                    "stop_id",
+                    "scheduled_arrival",
+                    "actual_arrival",
+                    "delay_seconds",
+                    "timestamp",
+                },
+            )
+
+            persistence_result = persist_collection_result(collection_result)
+
+            self.assertEqual(
+                persistence_result,
+                {
+                    "vehicle_positions_processed": 1,
+                    "trip_updates_processed": 1,
+                },
+            )
+
+            connection = database_connection.get_connection()
+            try:
+                cursor = connection.cursor()
+                cursor.execute(
+                    "SELECT vehicle_id, route_id, timestamp FROM vehicle_positions"
+                )
+                vehicle = dict(cursor.fetchone())
+                cursor.execute(
+                    "SELECT trip_id, stop_id, delay_seconds, timestamp "
+                    "FROM trip_updates"
+                )
+                trip_update = dict(cursor.fetchone())
+            finally:
+                connection.close()
+
+            self.assertEqual(vehicle["vehicle_id"], "2606")
+            self.assertEqual(vehicle["route_id"], "N721")
+            self.assertEqual(vehicle["timestamp"], "2026-08-30T01:03:05+09:30")
+            self.assertEqual(trip_update["trip_id"], "1090314")
+            self.assertEqual(trip_update["stop_id"], "5281")
+            self.assertEqual(trip_update["delay_seconds"], 470)
+            self.assertEqual(
+                trip_update["timestamp"],
+                "2026-08-30T01:03:05+09:30",
+            )
         finally:
             database_connection.DATABASE_PATH = original_database_path
             temporary_directory.cleanup()
