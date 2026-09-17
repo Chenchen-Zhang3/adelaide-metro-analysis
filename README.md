@@ -193,3 +193,76 @@ Later sprints will focus on:
 - Route and time-period analysis
 - Further map and accessibility integration
 - More complete system integration and testing
+
+
+## Historical GTFS-Realtime Collection
+
+The project supports collecting and storing live Adelaide Metro GTFS-Realtime
+data in a historical SQLite database.
+
+The collection runner processes Vehicle Positions and Trip Updates and
+preserves records across multiple collection cycles for later querying and
+analysis.
+
+### Requirements
+
+Download the latest Adelaide Metro static GTFS feed and provide the
+`stop_times.txt` file locally.
+
+Local GTFS data and generated SQLite databases are excluded from Git.
+
+Example local structure:
+
+```text
+data/
+├── static_gtfs/
+│   └── stop_times.txt
+└── history/
+    └── adelaide_metro_history.db
+
+Run One Collection Cycle
+
+```bash
+py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --cycles 1
+```
+Run Multiple Collection Cycles
+
+```bash
+py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --cycles 3
+```
+Run Continuous Historical Collection
+
+```bash
+py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --continuous
+```
+Use Ctrl+C to stop continuous collection.
+
+Historical Queries
+
+Stored Trip Update records can be queried by:
+
+- route ID
+- stop ID
+- time range
+- combined route, stop and time filters
+
+Stored Vehicle Position records can be queried by:
+
+- vehicle ID
+- route ID
+- time range
+- combined filters
+
+These query interfaces support historical transport analysis and provide a
+foundation for later vehicle playback functionality.
+
+Testing
+
+Sprint 3 database integration is covered by automated repository, persistence,
+pipeline and realtime processing integration tests.
+
+See:
+
+docs/testing/sprint3-database-integration-test-report.md
+
+for the Sprint 3 database integration test results and live data verification.
