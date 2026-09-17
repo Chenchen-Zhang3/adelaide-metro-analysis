@@ -21,32 +21,23 @@ def load_fixture(filename):
 
 
 def test_persist_collection_result(monkeypatch):
-    # Track stored vehicle records.
-    stored_vehicles = []
+    # Track the collection sent to the repository transaction.
+    persisted_collections = []
 
-    # Track stored trip updates.
-    stored_updates = []
+    def fake_persist_realtime_collection(vehicle_positions, trip_updates):
+        persisted_collections.append((vehicle_positions, trip_updates))
+        return {
+            "vehicle_positions_received": len(vehicle_positions),
+            "vehicle_positions_inserted": len(vehicle_positions),
+            "trip_updates_received": len(trip_updates),
+            "trip_updates_inserted": len(trip_updates),
+        }
 
-    def fake_insert_vehicle_position(record):
-        # Store the test vehicle record.
-        stored_vehicles.append(record)
-
-    def fake_insert_trip_update(record):
-        # Store the test trip update.
-        stored_updates.append(record)
-
-    # Replace vehicle insertion for the test.
+    # Replace the repository transaction for this unit test.
     monkeypatch.setattr(
         pipeline,
-        "insert_vehicle_position",
-        fake_insert_vehicle_position,
-    )
-
-    # Replace trip update insertion for the test.
-    monkeypatch.setattr(
-        pipeline,
-        "insert_trip_update",
-        fake_insert_trip_update,
+        "persist_realtime_collection",
+        fake_persist_realtime_collection,
     )
 
     # Create a sample collection result.
@@ -73,13 +64,16 @@ def test_persist_collection_result(monkeypatch):
         collection_result
     )
 
-    # Check stored record counts.
-    assert len(stored_vehicles) == 1
-    assert len(stored_updates) == 1
+    # Check the transaction received both record groups.
+    assert len(persisted_collections) == 1
+    assert len(persisted_collections[0][0]) == 1
+    assert len(persisted_collections[0][1]) == 1
 
     # Check returned processing counts.
     assert result["vehicle_positions_processed"] == 1
     assert result["trip_updates_processed"] == 1
+    assert result["vehicle_positions_inserted"] == 1
+    assert result["trip_updates_inserted"] == 1
 
 
 def test_query_and_analyse(monkeypatch):

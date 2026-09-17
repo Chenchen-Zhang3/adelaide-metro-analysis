@@ -319,11 +319,20 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
             persistence_result = persist_collection_result(collection_result)
 
             self.assertEqual(
-                persistence_result,
-                {
-                    "vehicle_positions_processed": 1,
-                    "trip_updates_processed": 1,
-                },
+                persistence_result["vehicle_positions_processed"],
+                1,
+            )
+            self.assertEqual(
+                persistence_result["trip_updates_processed"],
+                1,
+            )
+            self.assertEqual(
+                persistence_result["vehicle_positions_inserted"],
+                1,
+            )
+            self.assertEqual(
+                persistence_result["trip_updates_inserted"],
+                1,
             )
 
             connection = database_connection.get_connection()

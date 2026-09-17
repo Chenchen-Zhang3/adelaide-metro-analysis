@@ -4,8 +4,7 @@ from time import sleep
 from backend.analysis.aggregation import prepare_analysis_output
 from backend.database.repository import (
     get_trip_updates_filtered,
-    insert_trip_update,
-    insert_vehicle_position,
+    persist_realtime_collection,
 )
 from backend.realtime.collector import (
     GTFSRealtimeRetryExhaustedError,
@@ -13,7 +12,7 @@ from backend.realtime.collector import (
 
 
 def persist_collection_result(collection_result):
-    """Store collected realtime records in the database."""
+    """Persist one collected realtime cycle as a single transaction."""
 
     # Get collected vehicle positions.
     vehicle_positions = collection_result.get(
@@ -27,18 +26,17 @@ def persist_collection_result(collection_result):
         [],
     )
 
-    # Store vehicle position records.
-    for vehicle_position in vehicle_positions:
-        insert_vehicle_position(vehicle_position)
+    # Delegate the database transaction to the repository layer.
+    persistence_summary = persist_realtime_collection(
+        vehicle_positions,
+        trip_updates,
+    )
 
-    # Store trip update records.
-    for trip_update in trip_updates:
-        insert_trip_update(trip_update)
-
-    # Return the processed record counts.
+    # Keep the established processed-count fields and expose transaction counts.
     return {
         "vehicle_positions_processed": len(vehicle_positions),
         "trip_updates_processed": len(trip_updates),
+        **persistence_summary,
     }
 
 
