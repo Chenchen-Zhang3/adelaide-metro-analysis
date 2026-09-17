@@ -219,7 +219,7 @@ data/
 │   └── stop_times.txt
 └── history/
     └── adelaide_metro_history.db
-
+```
 Run One Collection Cycle
 
 ```bash
