@@ -16,15 +16,15 @@ Adelaide Metro GTFS-Realtime feed
   -> GTFSRealtimeProcessingPipeline.process_once()
   -> database-ready dictionaries
   -> backend.services.pipeline.persist_collection_result()
-  -> insert_vehicle_position() / insert_trip_update()
+  -> one repository transaction for the collection cycle
   -> SQLite
 ```
 
 `GTFSRealtimeProcessingPipeline.process_once()` is the reusable processing
 entry point. It returns a dictionary with `vehicle_positions` and
 `trip_updates` lists. `persist_collection_result()` is the system-integration
-handover point: it passes each dictionary unchanged to the matching repository
-insert function and returns the attempted record counts.
+handover point: it passes each dictionary unchanged to the repository's
+collection-cycle transaction and returns attempted and inserted record counts.
 
 The current client and decoder were also checked against the live Adelaide
 Metro Vehicle Positions and Trip Updates feeds. The deterministic automated
@@ -90,23 +90,42 @@ record.
 | --- | --- | --- |
 | Feed requests and transient request retries | `GTFSRealtimeClient` / `GTFSRealtimeCollector` | A retry-exhausted cycle is skipped by scheduled collection. |
 | Feed/entity and converter validation | `backend.realtime.validation`, converters and `historical_records` | Invalid or incomplete entities are skipped; valid entities in the same feed continue. |
-| Record-to-database handover | `persist_collection_result()` | Iterates the two database-ready lists without changing their fields. |
+| Record-to-database handover | `persist_collection_result()` | Delegates the two database-ready lists without changing their fields. |
 | Duplicate handling | SQLite repository unique indexes plus `INSERT OR IGNORE` | Duplicate rows are ignored at insertion. |
-| Database errors and transaction policy | Repository/application integration layer | Current insert methods commit one record at a time and propagate database errors; no batch transaction interface exists. |
+| Database errors and transaction policy | Repository/application integration layer | One transaction spans both record lists; SQLite failures are logged, rolled back and re-raised to the caller. |
 
 The processing pipeline must not retry database errors or implement a second
 deduplication scheme. A collection cycle containing invalid realtime entities
-can still persist its valid records. A database insertion failure is not
-currently isolated per record or per cycle.
+can still persist its valid records. A SQLite persistence failure rolls back
+the whole collection-cycle transaction and remains visible to the caller.
 
-## Current status and SCRUM-186
+## SCRUM-186 persistence behaviour
 
-The existing processing records, shared JSON schemas and SQLite repository
-input shapes match; SCRUM-185 required no production field/type changes.
+`persist_realtime_collection()` begins one SQLite transaction for a completed
+collection cycle, writes Vehicle Positions and Trip Updates using the existing
+`INSERT OR IGNORE` statements, then commits only after both record lists have
+been processed. It returns received and inserted counts for each record type.
+It intentionally does not expose a duplicate count: SQLite `INSERT OR IGNORE`
+can ignore more than duplicate-key rows, so a duplicate-specific count would
+not be reliable.
 
-SCRUM-186 can build on `collect_and_persist()` or
-`run_collection_and_persist()` to implement the next agreed persistence
-behaviour. Before introducing a production writer, decide whether it needs
-batch transactions, per-record database-error handling, operational database
-configuration/migrations, and live static-GTFS index refresh. These are
-database/runtime concerns and are deliberately outside this handover contract.
+Connection/setup, Vehicle Position, Trip Update and commit failures are logged
+with their stage, trigger a rollback where a transaction exists, and preserve
+the original SQLite exception. `run_collection_and_persist()` therefore cannot
+mistake a failed database write for a successful collection cycle.
+
+SQLite remains the configured database. Its path defaults to
+`backend/database/adelaide_metro.db`, but an application can set
+`ADELAIDE_METRO_DATABASE_PATH` before startup to select another path without
+placing configuration in GTFS business logic. `create_tables()` remains
+idempotent through `IF NOT EXISTS`; repeat initialisation preserves historical
+rows and duplicate-protection indexes.
+
+## Remaining SCRUM-187 work
+
+The static stop-time index is constructed from static GTFS outside the realtime
+workflow and injected into the pipeline once, so it is already reused across
+collection cycles and does not block persistence. SCRUM-187 should decide when
+the static feed is refreshed and create the bounded continuous collection
+runner. It should use the C02 transaction boundary rather than add persistence
+logic to decoding or conversion.

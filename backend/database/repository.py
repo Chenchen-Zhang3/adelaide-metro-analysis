@@ -1,6 +1,138 @@
+import logging
+import sqlite3
 from datetime import datetime
 
 from backend.database.connection import get_connection
+
+
+logger = logging.getLogger(__name__)
+
+
+def _rollback_realtime_transaction(connection):
+    """Roll back without obscuring the original SQLite persistence error."""
+    try:
+        connection.rollback()
+    except sqlite3.Error:
+        logger.exception("Failed to roll back realtime persistence transaction")
+
+
+def _insert_trip_update(cursor, trip_update):
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO trip_updates (
+            trip_id,
+            route_id,
+            stop_id,
+            scheduled_arrival,
+            actual_arrival,
+            delay_seconds,
+            timestamp
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            trip_update["trip_id"],
+            trip_update["route_id"],
+            trip_update["stop_id"],
+            trip_update.get("scheduled_arrival"),
+            trip_update.get("actual_arrival"),
+            trip_update["delay_seconds"],
+            trip_update.get("timestamp"),
+        ),
+    )
+    return cursor.rowcount
+
+
+def _insert_vehicle_position(cursor, vehicle):
+    cursor.execute(
+        """
+        INSERT OR IGNORE INTO vehicle_positions (
+            vehicle_id,
+            trip_id,
+            route_id,
+            latitude,
+            longitude,
+            timestamp
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            vehicle["vehicle_id"],
+            vehicle.get("trip_id"),
+            vehicle.get("route_id"),
+            vehicle["latitude"],
+            vehicle["longitude"],
+            vehicle.get("timestamp"),
+        ),
+    )
+    return cursor.rowcount
+
+
+def persist_realtime_collection(vehicle_positions, trip_updates):
+    """Persist one realtime collection cycle in a single SQLite transaction."""
+    vehicle_positions = tuple(vehicle_positions)
+    trip_updates = tuple(trip_updates)
+    connection = None
+
+    try:
+        try:
+            connection = get_connection()
+            cursor = connection.cursor()
+            cursor.execute("BEGIN")
+        except sqlite3.Error:
+            logger.exception("Failed to set up realtime persistence transaction")
+            raise
+
+        try:
+            vehicle_positions_inserted = sum(
+                _insert_vehicle_position(cursor, vehicle)
+                for vehicle in vehicle_positions
+            )
+        except sqlite3.Error:
+            _rollback_realtime_transaction(connection)
+            logger.exception(
+                "Failed while persisting vehicle position records; transaction rolled back"
+            )
+            raise
+
+        try:
+            trip_updates_inserted = sum(
+                _insert_trip_update(cursor, trip_update)
+                for trip_update in trip_updates
+            )
+        except sqlite3.Error:
+            _rollback_realtime_transaction(connection)
+            logger.exception(
+                "Failed while persisting trip update records; transaction rolled back"
+            )
+            raise
+
+        try:
+            connection.commit()
+        except sqlite3.Error:
+            _rollback_realtime_transaction(connection)
+            logger.exception(
+                "Failed to commit realtime persistence transaction; transaction rolled back"
+            )
+            raise
+
+        summary = {
+            "vehicle_positions_received": len(vehicle_positions),
+            "vehicle_positions_inserted": vehicle_positions_inserted,
+            "trip_updates_received": len(trip_updates),
+            "trip_updates_inserted": trip_updates_inserted,
+        }
+        logger.info(
+            "Persisted realtime collection cycle: %d/%d vehicle positions and %d/%d trip updates inserted",
+            summary["vehicle_positions_inserted"],
+            summary["vehicle_positions_received"],
+            summary["trip_updates_inserted"],
+            summary["trip_updates_received"],
+        )
+        return summary
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 def insert_route(route):
@@ -113,64 +245,30 @@ def insert_stop_time(stop_time):
 
 def insert_trip_update(trip_update):
     connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO trip_updates (
-            trip_id,
-            route_id,
-            stop_id,
-            scheduled_arrival,
-            actual_arrival,
-            delay_seconds,
-            timestamp
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            trip_update["trip_id"],
-            trip_update["route_id"],
-            trip_update["stop_id"],
-            trip_update.get("scheduled_arrival"),
-            trip_update.get("actual_arrival"),
-            trip_update["delay_seconds"],
-            trip_update.get("timestamp"),
-        ),
-    )
-
-    connection.commit()
-    connection.close()
+    try:
+        inserted = _insert_trip_update(connection.cursor(), trip_update)
+        connection.commit()
+        return inserted
+    except sqlite3.Error:
+        _rollback_realtime_transaction(connection)
+        logger.exception("Failed while persisting a trip update record")
+        raise
+    finally:
+        connection.close()
 
 
 def insert_vehicle_position(vehicle):
     connection = get_connection()
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """
-        INSERT OR IGNORE INTO vehicle_positions (
-            vehicle_id,
-            trip_id,
-            route_id,
-            latitude,
-            longitude,
-            timestamp
-        )
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (
-            vehicle["vehicle_id"],
-            vehicle.get("trip_id"),
-            vehicle.get("route_id"),
-            vehicle["latitude"],
-            vehicle["longitude"],
-            vehicle.get("timestamp"),
-        ),
-    )
-
-    connection.commit()
-    connection.close()
+    try:
+        inserted = _insert_vehicle_position(connection.cursor(), vehicle)
+        connection.commit()
+        return inserted
+    except sqlite3.Error:
+        _rollback_realtime_transaction(connection)
+        logger.exception("Failed while persisting a vehicle position record")
+        raise
+    finally:
+        connection.close()
 
 
 def get_stop(stop_id):
