@@ -5,10 +5,30 @@ separately so that the polling policy can be adjusted without changing client
 or processing code.
 """
 
+import os
 from dataclasses import dataclass
 
 
 BASE_URL = "https://gtfs.adelaidemetro.com.au/v1"
+POLLING_INTERVAL_ENVIRONMENT_VARIABLE = (
+    "ADELAIDE_METRO_POLLING_INTERVAL_SECONDS"
+)
+
+
+def configured_polling_interval_seconds(environ=None):
+    """Return the polling interval, optionally configured before startup."""
+    environment = os.environ if environ is None else environ
+    configured_interval = environment.get(POLLING_INTERVAL_ENVIRONMENT_VARIABLE)
+
+    if configured_interval is None:
+        return 60
+
+    try:
+        return int(configured_interval)
+    except ValueError as error:
+        raise ValueError(
+            f"{POLLING_INTERVAL_ENVIRONMENT_VARIABLE} must be an integer"
+        ) from error
 
 
 @dataclass(frozen=True)
@@ -35,4 +55,6 @@ class GTFSRealtimeCollectionSettings:
             raise ValueError("Retry delay must be greater than zero")
 
 
-DEFAULT_COLLECTION_SETTINGS = GTFSRealtimeCollectionSettings()
+DEFAULT_COLLECTION_SETTINGS = GTFSRealtimeCollectionSettings(
+    polling_interval_seconds=configured_polling_interval_seconds()
+)

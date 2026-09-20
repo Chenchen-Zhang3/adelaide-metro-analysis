@@ -25,6 +25,7 @@ The current prototype includes:
 - Scheduled Vehicle Position and Trip Update collection with bounded retry
 - Record validation, database-ready historical mapping and delay handling
 - Standard logging and a reusable realtime processing pipeline
+- Continuous historical GTFS-Realtime collection with transactional persistence
 
 ## Project Structure
 
@@ -116,6 +117,20 @@ python -m unittest backend.tests.test_static_gtfs backend.tests.test_realtime_cl
 
 Sprint 2 realtime processing tests and the database handoff contract are
 documented in [GTFS Processing and Database Handoff](docs/architecture/gtfs-processing.md).
+
+## Continuous Historical Collection
+
+After extracting a current static GTFS feed to a local directory containing
+`stop_times.txt`, start the collector with:
+
+```powershell
+$env:ADELAIDE_METRO_DATABASE_PATH = "$PWD\data\historical\adelaide-metro-history.db"
+python -m backend.services.historical_collection --static-gtfs-dir "$PWD\data\static-gtfs"
+```
+
+The runner reuses the existing scheduled collector and collection-cycle SQLite
+transaction. Full setup, shutdown, restart and hosting guidance is in
+[Continuous Historical GTFS Collection Runner](docs/architecture/historical-collection-runner.md).
 
 Run full backend test discovery with:
 
