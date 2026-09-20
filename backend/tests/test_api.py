@@ -185,6 +185,82 @@ def test_get_stop_detail_from_database(monkeypatch, tmp_path):
     assert response.get_json() == sample_stop
 
 
+def test_get_stop_routes(monkeypatch):
+    sample_routes = [
+        {
+            "route_id": "R1",
+            "route_short_name": "R1",
+            "route_long_name": "Test Route",
+            "route_type": 3,
+        }
+    ]
+
+    monkeypatch.setattr(
+        "backend.api.app.get_routes_by_stop",
+        lambda stop_id: sample_routes,
+    )
+
+    client = app.test_client()
+    response = client.get("/api/stops/STOP_001/routes")
+
+    assert response.status_code == 200
+    assert response.get_json() == sample_routes
+
+
+def test_get_stop_routes_from_database(monkeypatch, tmp_path):
+    from backend.database import connection
+    from backend.database.models import create_tables
+    from backend.database.repository import (
+        insert_route,
+        insert_trip,
+        insert_stop_time,
+    )
+
+    test_database = tmp_path / "test_stop_routes_api.db"
+
+    monkeypatch.setattr(
+        connection,
+        "DATABASE_PATH",
+        test_database,
+    )
+
+    create_tables()
+
+    sample_route = {
+        "route_id": "R1",
+        "route_short_name": "R1",
+        "route_long_name": "Test Route",
+        "route_type": 3,
+    }
+
+    sample_trip = {
+        "trip_id": "T1",
+        "route_id": "R1",
+        "service_id": "SVC1",
+        "trip_headsign": "City",
+        "direction_id": 0,
+    }
+
+    sample_stop_time = {
+        "trip_id": "T1",
+        "arrival_time": "10:00:00",
+        "departure_time": "10:00:00",
+        "stop_id": "STOP_001",
+        "stop_sequence": 1,
+    }
+
+    insert_route(sample_route)
+    insert_trip(sample_trip)
+    insert_stop_time(sample_stop_time)
+
+    client = app.test_client()
+    response = client.get("/api/stops/STOP_001/routes")
+
+    assert response.status_code == 200
+    assert response.get_json() == [sample_route]
+
+
+
 def test_get_route_performance(monkeypatch):
     sample_analysis = {
         "route_performance": {
