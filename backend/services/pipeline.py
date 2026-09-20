@@ -1,3 +1,5 @@
+import logging
+import sqlite3
 from datetime import datetime
 from time import sleep
 
@@ -6,9 +8,13 @@ from backend.database.repository import (
     get_trip_updates_filtered,
     persist_realtime_collection,
 )
+from backend.realtime.client import GTFSRealtimeRequestError
 from backend.realtime.collector import (
     GTFSRealtimeRetryExhaustedError,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def persist_collection_result(collection_result):
@@ -62,8 +68,14 @@ def run_collection_and_persist(
     collector,
     max_cycles=None,
     sleep_function=sleep,
+    stop_event=None,
 ):
-    """Continuously collect and store realtime data."""
+    """Continuously collect and store realtime data until stopped.
+
+    Feed and SQLite failures make one collection cycle unsuccessful, but do not
+    end the long-running historical collector. The next cycle still waits for
+    the configured polling interval, avoiding a tight retry loop.
+    """
 
     # Reject an invalid cycle limit.
     if max_cycles is not None and max_cycles < 0:
@@ -76,7 +88,13 @@ def run_collection_and_persist(
     results = []
 
     # Run until stopped or the cycle limit is reached.
-    while max_cycles is None or completed_cycles < max_cycles:
+    while (
+        (max_cycles is None or completed_cycles < max_cycles)
+        and (stop_event is None or not stop_event.is_set())
+    ):
+        cycle_number = completed_cycles + 1
+        logger.info("Starting historical GTFS collection cycle %d", cycle_number)
+
         try:
             # Collect and persist one cycle.
             result = collect_and_persist(collector)
@@ -84,18 +102,66 @@ def run_collection_and_persist(
             # Keep the successful cycle result.
             results.append(result)
 
+            persistence_result = result["persistence_result"]
+            logger.info(
+                "Completed historical GTFS collection cycle %d: "
+                "%d/%d vehicle positions and %d/%d trip updates inserted",
+                cycle_number,
+                persistence_result["vehicle_positions_inserted"],
+                persistence_result["vehicle_positions_received"],
+                persistence_result["trip_updates_inserted"],
+                persistence_result["trip_updates_received"],
+            )
+
         except GTFSRealtimeRetryExhaustedError:
-            # Skip a cycle when temporary retries fail.
-            pass
+            logger.warning(
+                "Historical GTFS collection cycle %d skipped because feed "
+                "retries were exhausted",
+                cycle_number,
+            )
+
+        except GTFSRealtimeRequestError as error:
+            logger.error(
+                "Historical GTFS collection cycle %d failed while retrieving "
+                "a feed: %s",
+                cycle_number,
+                error,
+            )
+
+        except (TypeError, ValueError) as error:
+            logger.error(
+                "Historical GTFS collection cycle %d failed while processing "
+                "feed data: %s",
+                cycle_number,
+                error,
+            )
+
+        except sqlite3.Error as error:
+            logger.error(
+                "Historical GTFS collection cycle %d failed while persisting "
+                "data; it was rolled back: %s",
+                cycle_number,
+                error,
+            )
 
         # Mark the cycle as completed.
         completed_cycles += 1
 
         # Wait before the next collection cycle.
         if max_cycles is None or completed_cycles < max_cycles:
-            sleep_function(
+            polling_interval_seconds = (
                 collector.client.settings.polling_interval_seconds
             )
+            logger.info(
+                "Waiting %d seconds before the next historical collection cycle",
+                polling_interval_seconds,
+            )
+            if stop_event is not None:
+                if stop_event.wait(polling_interval_seconds):
+                    logger.info("Historical GTFS collection stop requested")
+                    break
+            else:
+                sleep_function(polling_interval_seconds)
 
     # Return all successful cycle results.
     return results

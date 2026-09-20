@@ -121,11 +121,11 @@ placing configuration in GTFS business logic. `create_tables()` remains
 idempotent through `IF NOT EXISTS`; repeat initialisation preserves historical
 rows and duplicate-protection indexes.
 
-## Remaining SCRUM-187 work
+## SCRUM-187 continuous runtime
 
-The static stop-time index is constructed from static GTFS outside the realtime
-workflow and injected into the pipeline once, so it is already reused across
-collection cycles and does not block persistence. SCRUM-187 should decide when
-the static feed is refreshed and create the bounded continuous collection
-runner. It should use the C02 transaction boundary rather than add persistence
-logic to decoding or conversion.
+SCRUM-187 adds the startup lifecycle and reuses this C02 transaction boundary
+for every scheduled cycle. The runner builds the static stop-time index once at
+application startup, reuses it until restart, and passes the existing collector
+to the persistence-aware scheduler. See [Continuous Historical GTFS Collection
+Runner](historical-collection-runner.md) for the command, recovery policy and
+hosting limitation.
