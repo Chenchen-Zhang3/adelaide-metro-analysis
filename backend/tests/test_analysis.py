@@ -5,9 +5,12 @@ from backend.analysis.punctuality import (
 
 from backend.analysis.metrics import (
     average_delay,
-    delay_frequency,
+    delayed_rate,
     on_time_rate,
+    severe_delay_rate,
 )
+
+from backend.analysis.aggregation import prepare_analysis_output
 
 
 def test_delay_calculation():
@@ -41,10 +44,10 @@ def test_average_delay():
     assert average_delay(delays) == 6.25
 
 
-def test_delay_frequency():
+def test_delayed_rate():
     delays = [2, 3, 7, 12]
 
-    assert delay_frequency(delays) == 50.0
+    assert delayed_rate(delays) == 25.0
 
 
 def test_on_time_rate():
@@ -53,7 +56,11 @@ def test_on_time_rate():
     assert on_time_rate(delays) == 50.0
 
 
-from backend.analysis.aggregation import prepare_analysis_output
+def test_severe_delay_rate():
+    delays = [2, 3, 7, 12]
+
+    assert severe_delay_rate(delays) == 25.0
+
 
 def test_validate_analysis_with_sample_data():
     sample_records = [
@@ -90,20 +97,43 @@ def test_validate_analysis_with_sample_data():
     assert result["route_performance"]["R1"]["average_delay"] == 5.0
     assert result["route_performance"]["R1"]["on_time_count"] == 1
     assert result["route_performance"]["R1"]["delayed_count"] == 1
+    assert result["route_performance"]["R1"]["on_time_percentage"] == 50.0
+    assert result["route_performance"]["R1"]["delayed_percentage"] == 50.0
 
     assert result["route_performance"]["R2"]["early_count"] == 1
     assert (
         result["route_performance"]["R2"]["severely_delayed_count"]
         == 1
     )
+    assert result["route_performance"]["R2"]["early_percentage"] == 50.0
+    assert (
+        result["route_performance"]["R2"]["severe_delay_percentage"]
+        == 50.0
+    )
 
     # Validate stop-level results
     assert result["stop_performance"]["A01"]["average_delay"] == 5.0
+    assert result["stop_performance"]["A01"]["on_time_percentage"] == 50.0
+    assert result["stop_performance"]["A01"]["delayed_percentage"] == 50.0
+
     assert result["stop_performance"]["A02"]["average_delay"] == 5.0
+    assert result["stop_performance"]["A02"]["early_percentage"] == 50.0
+    assert (
+        result["stop_performance"]["A02"]["severe_delay_percentage"]
+        == 50.0
+    )
 
     # Validate time-period results
     assert result["time_period_performance"]["Morning"]["on_time_count"] == 1
     assert result["time_period_performance"]["Morning"]["delayed_count"] == 1
+    assert (
+        result["time_period_performance"]["Morning"]["on_time_percentage"]
+        == 50.0
+    )
+    assert (
+        result["time_period_performance"]["Morning"]["delayed_percentage"]
+        == 50.0
+    )
 
     assert result["time_period_performance"]["Afternoon"]["early_count"] == 1
     assert (
@@ -112,3 +142,7 @@ def test_validate_analysis_with_sample_data():
         ]
         == 1
     )
+
+    # Validate delay hotspot output
+    assert "delay_hotspots" in result
+    assert len(result["delay_hotspots"]) == 2
