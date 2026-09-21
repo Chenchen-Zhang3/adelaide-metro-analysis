@@ -132,6 +132,10 @@ The runner reuses the existing scheduled collector and collection-cycle SQLite
 transaction. Full setup, shutdown, restart and hosting guidance is in
 [Continuous Historical GTFS Collection Runner](docs/architecture/historical-collection-runner.md).
 
+For the CASR always-on Windows computer, use the
+[Windows Historical Collector Deployment Guide](docs/deployment/windows-historical-collector.md)
+and `scripts/start_historical_collector.bat`.
+
 Run full backend test discovery with:
 
 ```bash
