@@ -25,7 +25,7 @@ adelaide-metro-analysis\
     static_gtfs\
       stop_times.txt
     historical\
-      adelaide_metro_history.db
+      adelaide_metro_history_v2.db
     backups\
   logs\
     historical_collector.log
@@ -94,9 +94,10 @@ Default environment values:
 | --- | --- |
 | `ADELAIDE_METRO_PYTHON` | `.venv\Scripts\python.exe` |
 | `ADELAIDE_METRO_STATIC_GTFS_PATH` | `data\static_gtfs` |
-| `ADELAIDE_METRO_DATABASE_PATH` | `data\historical\adelaide_metro_history.db` |
+| `ADELAIDE_METRO_DATABASE_PATH` | `data\historical\adelaide_metro_history_v2.db` |
 | `ADELAIDE_METRO_LOG_PATH` | `logs\historical_collector.log` |
 | `ADELAIDE_METRO_POLLING_INTERVAL_SECONDS` | `60` |
+| `ADELAIDE_METRO_TRIP_UPDATE_CHECKPOINT_SECONDS` | `900` |
 
 Set a variable before launching only when the CASR computer needs a different
 location. Do not place credentials in the batch file.
@@ -133,17 +134,26 @@ failures, waits and shutdown.
 To confirm data is accumulating:
 
 ```powershell
-.\.venv\Scripts\python.exe -c "import sqlite3; db=sqlite3.connect(r'data\historical\adelaide_metro_history.db'); print('vehicles:', db.execute('SELECT COUNT(*) FROM vehicle_positions').fetchone()[0]); print('trip updates:', db.execute('SELECT COUNT(*) FROM trip_updates').fetchone()[0]); db.close()"
+.\.venv\Scripts\python.exe -c "import sqlite3; db=sqlite3.connect(r'data\historical\adelaide_metro_history_v2.db'); print('vehicles:', db.execute('SELECT COUNT(*) FROM vehicle_positions').fetchone()[0]); print('trip updates:', db.execute('SELECT COUNT(*) FROM trip_updates').fetchone()[0]); db.close()"
 ```
 
-Counts normally increase after successful cycles. They may remain unchanged
-when the feed repeats the same snapshot because duplicate rows are ignored.
+Vehicle counts normally increase after successful cycles. Trip Update history
+stores state changes immediately and unchanged-state checkpoints every 15
+minutes, so its count is not expected to increase on every poll. The
+`collection_cycles` table records every successful cycle even when all Trip
+Updates were unchanged.
 
 ## 8. Stop and restart
 
 For an interactive run, press `Ctrl+C`. The collector logs the shutdown and
-returns exit code 0. Starting the same batch file again reuses the existing
-database; schema initialisation does not delete historical records.
+returns exit code 0. Starting the same batch file again reuses the persisted
+`trip_update_current_state` table, so unchanged predictions are not duplicated
+after restart.
+
+The optimised collector must start with a new database. It deliberately refuses
+to modify a legacy database containing the old TEXT/`actual_arrival` schema.
+Keep the old database as a read-only archive and configure a new path before the
+first optimised run.
 
 For a scheduled run, first disable its startup trigger. If maintenance is
 required, wait until the log shows the collector is waiting between cycles,
@@ -185,7 +195,7 @@ Do not copy the actively written `.db` file directly. Use SQLite's online
 backup mechanism while the collector continues running:
 
 ```powershell
-.\.venv\Scripts\python.exe -m backend.services.historical_backup --database ".\data\historical\adelaide_metro_history.db" --output-dir ".\data\backups"
+.\.venv\Scripts\python.exe -m backend.services.historical_backup --database ".\data\historical\adelaide_metro_history_v2.db" --output-dir ".\data\backups"
 ```
 
 The command creates a timestamped snapshot and runs `PRAGMA integrity_check`.
@@ -201,6 +211,7 @@ different access method.
 | `stop_times.txt` not found | Confirm it is directly inside `data\static_gtfs`, or set `ADELAIDE_METRO_STATIC_GTFS_PATH`. |
 | Collector exits with code 2 | Check for another collector instance; also confirm the configured Python path exists. |
 | No new rows | Check the log for feed errors; repeated feed snapshots may also be ignored as duplicates. |
+| Legacy historical database detected | Preserve the old file, set `ADELAIDE_METRO_DATABASE_PATH` to a new filename, then restart. |
 | Database locked | Confirm only one Task Scheduler account/session is running the collector. |
 | No log file | Confirm the Task Scheduler account can write to the `logs` directory. |
 | Collector does not restart after power loss | Confirm the startup trigger, account credentials, failure restart settings and “Do not start a new instance” option. |

@@ -223,6 +223,13 @@ The collection runner processes Vehicle Positions and Trip Updates and
 preserves records across multiple collection cycles for later querying and
 analysis.
 
+Trip Updates use the storage-optimised schema: state changes are stored
+immediately, unchanged predictions receive periodic checkpoints, timestamps are
+stored internally as epoch integers, and `actual_arrival` is reconstructed from
+the schedule plus delay. See
+`docs/architecture/historical-storage-optimisation.md` for benchmarks and safe
+deployment guidance.
+
 ### Requirements
 
 Download the latest Adelaide Metro static GTFS feed and provide the

@@ -10,9 +10,10 @@ if errorlevel 1 (
 
 if not defined ADELAIDE_METRO_PYTHON set "ADELAIDE_METRO_PYTHON=%PROJECT_ROOT%\.venv\Scripts\python.exe"
 if not defined ADELAIDE_METRO_STATIC_GTFS_PATH set "ADELAIDE_METRO_STATIC_GTFS_PATH=%PROJECT_ROOT%\data\static_gtfs"
-if not defined ADELAIDE_METRO_DATABASE_PATH set "ADELAIDE_METRO_DATABASE_PATH=%PROJECT_ROOT%\data\historical\adelaide_metro_history.db"
+if not defined ADELAIDE_METRO_DATABASE_PATH set "ADELAIDE_METRO_DATABASE_PATH=%PROJECT_ROOT%\data\historical\adelaide_metro_history_v2.db"
 if not defined ADELAIDE_METRO_LOG_PATH set "ADELAIDE_METRO_LOG_PATH=%PROJECT_ROOT%\logs\historical_collector.log"
 if not defined ADELAIDE_METRO_POLLING_INTERVAL_SECONDS set "ADELAIDE_METRO_POLLING_INTERVAL_SECONDS=60"
+if not defined ADELAIDE_METRO_TRIP_UPDATE_CHECKPOINT_SECONDS set "ADELAIDE_METRO_TRIP_UPDATE_CHECKPOINT_SECONDS=900"
 
 if not exist "%ADELAIDE_METRO_PYTHON%" (
     echo ERROR: Collector Python was not found: %ADELAIDE_METRO_PYTHON%
@@ -34,6 +35,7 @@ echo Starting Adelaide Metro historical collector...
 echo Database: %ADELAIDE_METRO_DATABASE_PATH%
 echo Static GTFS: %ADELAIDE_METRO_STATIC_GTFS_PATH%
 echo Log: %ADELAIDE_METRO_LOG_PATH%
+echo Unchanged Trip Update checkpoint: %ADELAIDE_METRO_TRIP_UPDATE_CHECKPOINT_SECONDS% seconds
 
 "%ADELAIDE_METRO_PYTHON%" -m backend.services.historical_collection %*
 set "COLLECTOR_EXIT_CODE=%ERRORLEVEL%"
