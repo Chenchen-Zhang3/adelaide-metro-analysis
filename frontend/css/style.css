@@ -2,13 +2,11 @@
     box-sizing: border-box;
 }
 
-
 html,
 body {
     margin: 0;
     min-height: 100%;
 }
-
 
 body {
     font-family: Arial, Helvetica, sans-serif;
@@ -25,28 +23,25 @@ body {
     padding: 20px 32px;
 }
 
-
 .page-header h1 {
     margin: 0 0 6px;
     font-size: 24px;
-    line-height: 1.25;
     color: #1d2939;
 }
-
 
 .page-header p {
     margin: 0;
     color: #667085;
-    font-size: 15px;
+    font-size: 14px;
 }
 
 
-/* MAIN LAYOUT */
+/* LAYOUT */
 
 .app-layout {
     display: grid;
-    grid-template-columns: 350px minmax(0, 1fr);
-    min-height: calc(100vh - 87px);
+    grid-template-columns: 360px minmax(0, 1fr);
+    min-height: calc(100vh - 86px);
 }
 
 
@@ -59,11 +54,9 @@ body {
     overflow-y: auto;
 }
 
-
 .sidebar-heading {
     margin-bottom: 28px;
 }
-
 
 .sidebar-heading h2 {
     margin: 0 0 7px;
@@ -71,19 +64,16 @@ body {
     color: #1d2939;
 }
 
-
 .sidebar-heading p {
     margin: 0;
+    color: #667085;
     font-size: 13px;
     line-height: 1.5;
-    color: #667085;
 }
-
 
 .sidebar-section {
     margin-bottom: 28px;
 }
-
 
 .section-heading {
     display: flex;
@@ -91,7 +81,6 @@ body {
     gap: 10px;
     margin-bottom: 12px;
 }
-
 
 .section-number {
     width: 24px;
@@ -102,21 +91,19 @@ body {
     align-items: center;
     justify-content: center;
 
-    background: #eef2f6;
     border-radius: 50%;
+    background: #eef2f6;
 
     font-size: 12px;
     font-weight: 700;
     color: #344054;
 }
 
-
 .section-heading h3 {
     margin: 1px 0 3px;
     font-size: 14px;
     color: #344054;
 }
-
 
 .section-heading p {
     margin: 0;
@@ -126,14 +113,29 @@ body {
 }
 
 
-.simple-section-heading {
-    margin: 0 0 10px;
-    font-size: 14px;
-    color: #475467;
+/* ROUTE SELECT */
+
+#routeSelect {
+    width: 100%;
+    padding: 11px 12px;
+
+    border: 1px solid #d0d5dd;
+    border-radius: 8px;
+
+    background: #ffffff;
+    color: #344054;
+
+    font-size: 13px;
+    cursor: pointer;
+}
+
+#routeSelect:focus {
+    outline: 2px solid #d0d5dd;
+    outline-offset: 1px;
 }
 
 
-/* LOCATION BUTTON */
+/* BUTTON */
 
 #locationButton {
     width: 100%;
@@ -149,262 +151,78 @@ body {
     font-weight: 600;
 
     cursor: pointer;
-
-    transition:
-        background 0.2s ease,
-        transform 0.1s ease;
 }
-
 
 #locationButton:hover {
     background: #344054;
 }
 
-
-#locationButton:active {
-    transform: scale(0.99);
-}
-
-
 #locationButton:disabled {
+    opacity: 0.65;
     cursor: wait;
-    opacity: 0.7;
 }
-
 
 .map-instruction {
-    margin: 9px 0 0;
-    font-size: 12px;
-    line-height: 1.4;
+    margin: 9px 0 12px;
     text-align: center;
     color: #667085;
+    font-size: 12px;
 }
 
 
-/* INFORMATION CARDS */
+/* CARDS */
 
-.info-card,
-.nearby-stops-card {
+.info-card {
+    padding: 14px;
+
     background: #f8fafc;
     border: 1px solid #e4e7ec;
     border-radius: 9px;
-    padding: 14px;
 }
 
-
-.info-card p,
-.nearby-stops-card > p {
+.info-card p {
     margin: 0;
+    color: #667085;
     font-size: 13px;
     line-height: 1.5;
-    color: #667085;
 }
-
 
 .empty-card {
     min-height: 58px;
-    display: flex;
-    align-items: center;
+}
+
+.location-card {
+    margin-top: 12px;
 }
 
 
-/* SELECTED LOCATION */
+/* LOCATION */
 
 .location-label {
     display: block;
     margin-bottom: 8px;
+
     font-size: 14px;
     font-weight: 700;
     color: #344054;
 }
 
-
-.coordinate-row {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 5px;
-    font-size: 12px;
-}
-
-
-.coordinate-label {
-    color: #667085;
-}
-
-
-.coordinate-value {
-    font-weight: 600;
-    color: #344054;
-}
-
-
-/* NEAREST STOP */
-
-.nearest-stop-name {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 15px;
-    color: #1d2939;
-}
-
-
-.nearest-stop-id {
-    margin-bottom: 8px;
-    font-size: 12px;
-    color: #667085;
-}
-
-
-.nearest-distance {
-    display: inline-block;
-    padding: 5px 8px;
-    background: #eef2f6;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 700;
-    color: #344054;
-}
-
-
-/* NEARBY STOPS */
-
-.nearby-stop {
-    cursor: pointer;
-    padding: 11px 6px;
-    border-bottom: 1px solid #e4e7ec;
-    color: #344054;
-    transition: background 0.2s ease;
-}
-
-
-.nearby-stop:first-child {
-    padding-top: 4px;
-}
-
-
-.nearby-stop:last-child {
-    border-bottom: none;
-    padding-bottom: 4px;
-}
-
-
-.nearby-stop:hover {
-    background: #eef2f6;
-}
-
-
-.nearby-stop strong {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 13px;
-}
-
-
-.nearby-stop span {
-    display: block;
-    font-size: 12px;
-    color: #667085;
-}
-
-
-/* SELECTED STOP */
-
-.selected-stop-name {
-    display: block;
-    margin-bottom: 4px;
-    font-size: 15px;
-    color: #1d2939;
-}
-
-
-.selected-stop-id {
-    margin-bottom: 14px;
-    font-size: 12px;
-    color: #667085;
-}
-
-
-/* ROUTES */
-
-.detail-heading {
-    margin: 14px 0 8px;
-    padding-top: 12px;
-    border-top: 1px solid #e4e7ec;
-
-    font-size: 12px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #667085;
-}
-
-
-.detail-heading:first-of-type {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: none;
-}
-
-
-.route-item {
-    margin-top: 8px;
-    padding: 10px;
-    background: #ffffff;
-    border: 1px solid #e4e7ec;
-    border-radius: 7px;
-}
-
-
-.route-short-name {
-    display: block;
-    margin-bottom: 3px;
-    font-size: 14px;
-    font-weight: 700;
-    color: #1d2939;
-}
-
-
-.route-long-name {
-    font-size: 12px;
-    line-height: 1.4;
-    color: #667085;
-}
-
-
-/* PERFORMANCE */
-
-.performance-item {
-    margin-top: 8px;
-    padding: 11px;
-
-    background: #ffffff;
-    border: 1px solid #e4e7ec;
-    border-radius: 7px;
-}
-
-
+.coordinate-row,
 .performance-row {
     display: flex;
     justify-content: space-between;
-    gap: 12px;
+    gap: 14px;
 
-    margin-top: 6px;
-
+    margin-top: 7px;
     font-size: 12px;
 }
 
-
-.performance-row:first-child {
-    margin-top: 0;
-}
-
-
+.coordinate-label,
 .performance-label {
     color: #667085;
 }
 
-
+.coordinate-value,
 .performance-value {
     text-align: right;
     font-weight: 600;
@@ -412,28 +230,99 @@ body {
 }
 
 
-.delay-status {
+/* STOP INFORMATION */
+
+.selected-stop-name {
+    display: block;
+    margin-bottom: 4px;
+
+    font-size: 15px;
+    color: #1d2939;
+}
+
+.selected-stop-id {
+    margin-bottom: 4px;
+
+    font-size: 12px;
+    color: #667085;
+}
+
+.selected-stop-location {
+    margin-bottom: 14px;
+
+    font-size: 12px;
+    color: #667085;
+}
+
+.detail-heading {
+    margin: 15px 0 8px;
+    padding-top: 12px;
+
+    border-top: 1px solid #e4e7ec;
+
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #667085;
+}
+
+.route-item {
+    margin-top: 7px;
+    padding: 9px 10px;
+
+    background: #ffffff;
+    border: 1px solid #e4e7ec;
+    border-radius: 7px;
+}
+
+.route-short-name {
+    display: block;
+
+    font-size: 14px;
+    font-weight: 700;
+    color: #1d2939;
+}
+
+.route-long-name {
+    margin-top: 3px;
+
+    font-size: 12px;
+    line-height: 1.4;
+    color: #667085;
+}
+
+.detail-message {
+    margin: 0;
+
+    font-size: 12px;
+    line-height: 1.5;
+    color: #667085;
+}
+
+
+/* PERFORMANCE */
+
+.performance-card {
+    padding: 11px;
+
+    background: #ffffff;
+    border: 1px solid #e4e7ec;
+    border-radius: 7px;
+}
+
+.performance-summary {
     display: inline-block;
 
     margin-top: 10px;
     padding: 5px 8px;
 
-    border-radius: 6px;
-
     background: #eef2f6;
+    border-radius: 6px;
 
     font-size: 12px;
     font-weight: 700;
-
     color: #344054;
-}
-
-
-.detail-message {
-    margin: 0;
-    font-size: 12px;
-    line-height: 1.5;
-    color: #667085;
 }
 
 
@@ -444,15 +333,14 @@ body {
     padding: 24px 26px;
 }
 
-
 .map-heading {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     gap: 20px;
+
     margin-bottom: 16px;
 }
-
 
 .map-heading h2 {
     margin: 0 0 5px;
@@ -460,32 +348,35 @@ body {
     color: #1d2939;
 }
 
-
 .map-heading p {
     margin: 0;
-    font-size: 13px;
     color: #667085;
+    font-size: 13px;
 }
 
+.map-status {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+}
 
-.stop-count {
+.status-pill {
     white-space: nowrap;
+
+    padding: 7px 10px;
 
     background: #ffffff;
     border: 1px solid #e4e7ec;
     border-radius: 20px;
-
-    padding: 7px 11px;
 
     font-size: 12px;
     font-weight: 600;
     color: #475467;
 }
 
-
 #map {
     width: 100%;
-
     height: calc(100vh - 190px);
     min-height: 520px;
 
@@ -498,31 +389,46 @@ body {
 }
 
 
-/* LEAFLET */
+/* MAP MESSAGE */
+
+.map-message {
+    margin-bottom: 12px;
+    padding: 10px 12px;
+
+    background: #ffffff;
+    border: 1px solid #e4e7ec;
+    border-radius: 8px;
+
+    color: #475467;
+    font-size: 12px;
+}
+
+.hidden {
+    display: none;
+}
+
+
+/* POPUPS */
 
 .leaflet-popup-content {
     line-height: 1.5;
     color: #344054;
 }
 
-
 .leaflet-popup-content strong {
     color: #1d2939;
 }
 
 
-/* TABLET */
+/* RESPONSIVE */
 
 @media (max-width: 900px) {
 
     .app-layout {
-        grid-template-columns: 300px minmax(0, 1fr);
+        grid-template-columns: 310px minmax(0, 1fr);
     }
-
 }
 
-
-/* MOBILE */
 
 @media (max-width: 768px) {
 
@@ -530,49 +436,34 @@ body {
         padding: 18px;
     }
 
-
-    .page-header h1 {
-        font-size: 21px;
-    }
-
-
     .app-layout {
         display: block;
     }
 
-
     .sidebar {
         border-right: none;
         border-bottom: 1px solid #e4e7ec;
-        padding: 20px;
     }
-
 
     .map-section {
         padding: 20px;
     }
 
-
     .map-heading {
         display: block;
     }
 
-
-    .stop-count {
-        display: inline-block;
+    .map-status {
+        justify-content: flex-start;
         margin-top: 12px;
     }
-
 
     #map {
         height: 500px;
         min-height: 420px;
     }
-
 }
 
-
-/* SMALL PHONES */
 
 @media (max-width: 480px) {
 
@@ -580,40 +471,20 @@ body {
         padding: 15px 16px;
     }
 
-
     .page-header h1 {
         font-size: 19px;
     }
-
-
-    .page-header p {
-        font-size: 13px;
-    }
-
 
     .sidebar {
         padding: 18px 16px;
     }
 
-
-    .sidebar-heading h2 {
-        font-size: 20px;
-    }
-
-
     .map-section {
         padding: 18px 14px;
     }
-
-
-    .map-heading h2 {
-        font-size: 20px;
-    }
-
 
     #map {
         height: 430px;
         min-height: 380px;
     }
-
 }

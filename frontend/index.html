@@ -27,12 +27,10 @@
     <header class="page-header">
 
         <div>
-            <h1>
-                Adelaide Metro Real-Time Transport Analysis
-            </h1>
+            <h1>Adelaide Metro Transport Analysis</h1>
 
             <p>
-                Explore Adelaide Metro stops, accessibility and transport information.
+                Explore Adelaide Metro stops, routes and transport performance.
             </p>
         </div>
 
@@ -45,32 +43,91 @@
 
             <div class="sidebar-heading">
 
-                <h2>
-                    Transport Explorer
-                </h2>
+                <h2>Transport Explorer</h2>
 
                 <p>
-                    Choose your current location or select a point directly on the map.
+                    Select a stop or route to investigate Adelaide Metro performance.
                 </p>
 
             </div>
 
 
+            <!-- ROUTE SELECTION -->
+
             <section class="sidebar-section">
 
                 <div class="section-heading">
 
-                    <span class="section-number">
-                        1
-                    </span>
+                    <span class="section-number">1</span>
 
                     <div>
-                        <h3>
-                            Select Location
-                        </h3>
+                        <h3>Select Route</h3>
 
                         <p>
-                            Set Location A for nearby-stop calculations.
+                            Choose a route loaded from the backend.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <select id="routeSelect">
+
+                    <option value="">
+                        Loading routes...
+                    </option>
+
+                </select>
+
+            </section>
+
+
+            <!-- ROUTE PERFORMANCE -->
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">2</span>
+
+                    <div>
+                        <h3>Route Performance</h3>
+
+                        <p>
+                            Performance statistics for the selected route.
+                        </p>
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="routePerformance"
+                    class="info-card empty-card"
+                >
+
+                    <p>
+                        Select a route to view performance.
+                    </p>
+
+                </div>
+
+            </section>
+
+
+            <!-- LOCATION SELECTION -->
+
+            <section class="sidebar-section">
+
+                <div class="section-heading">
+
+                    <span class="section-number">3</span>
+
+                    <div>
+                        <h3>Select Location</h3>
+
+                        <p>
+                            Establish a geographic point for future accessibility analysis.
                         </p>
                     </div>
 
@@ -83,118 +140,37 @@
 
 
                 <p class="map-instruction">
-                    Or click anywhere on the map to select a location.
+                    Or click anywhere on the map.
                 </p>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span class="section-number">
-                        2
-                    </span>
-
-                    <div>
-                        <h3>
-                            Selected Location
-                        </h3>
-
-                        <p>
-                            Coordinates currently used for analysis.
-                        </p>
-                    </div>
-
-                </div>
 
 
                 <div
                     id="selectedLocationInfo"
-                    class="info-card empty-card"
+                    class="info-card location-card empty-card"
                 >
 
                     <p>
-                        No location selected yet.
+                        No location selected.
                     </p>
 
                 </div>
 
             </section>
 
+
+            <!-- SELECTED STOP -->
 
             <section class="sidebar-section">
 
                 <div class="section-heading">
 
-                    <span class="section-number">
-                        3
-                    </span>
+                    <span class="section-number">4</span>
 
                     <div>
-                        <h3>
-                            Nearest Stop
-                        </h3>
+                        <h3>Selected Stop</h3>
 
                         <p>
-                            Closest available Adelaide Metro stop.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="nearestStop"
-                    class="info-card empty-card"
-                >
-
-                    <p>
-                        Select a location to find the nearest stop.
-                    </p>
-
-                </div>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <h3 class="simple-section-heading">
-                    Other Nearby Stops
-                </h3>
-
-
-                <div
-                    id="nearbyStops"
-                    class="nearby-stops-card"
-                >
-
-                    <p>
-                        No location selected yet.
-                    </p>
-
-                </div>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span class="section-number">
-                        4
-                    </span>
-
-                    <div>
-                        <h3>
-                            Selected Stop
-                        </h3>
-
-                        <p>
-                            Routes and available performance information.
+                            Stop, route and delay information.
                         </p>
                     </div>
 
@@ -207,7 +183,7 @@
                 >
 
                     <p>
-                        Select a stop to view transport information.
+                        Select a stop marker to view information.
                     </p>
 
                 </div>
@@ -223,25 +199,40 @@
 
                 <div>
 
-                    <h2>
-                        Adelaide Map
-                    </h2>
+                    <h2>Adelaide Network Map</h2>
 
                     <p>
-                        Select a stop marker for details or click the map to choose Location A.
+                        Click a transport stop for details or click the map to select a location.
                     </p>
 
                 </div>
 
 
-                <div
-                    id="stopCount"
-                    class="stop-count"
-                >
-                    Loading stops...
+                <div class="map-status">
+
+                    <span
+                        id="stopCount"
+                        class="status-pill"
+                    >
+                        Loading stops...
+                    </span>
+
+                    <span
+                        id="routeCount"
+                        class="status-pill"
+                    >
+                        Loading routes...
+                    </span>
+
                 </div>
 
             </div>
+
+
+            <div
+                id="mapMessage"
+                class="map-message hidden"
+            ></div>
 
 
             <div id="map"></div>
