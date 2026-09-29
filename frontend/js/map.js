@@ -1,29 +1,27 @@
-// Stores valid GTFS stop data after it is loaded
-let stopData = [];
+const API_BASE_URL = "http://127.0.0.1:5000";
 
-// Stores Leaflet stop markers by stop ID
-const stopMarkers = {};
-
-// Stores the currently selected Location A marker
-let selectedLocationMarker = null;
-
-// Stores coordinates of the currently selected Location A
-let selectedLocation = null;
-
-
-// Adelaide city centre coordinates
 const ADELAIDE_LAT = -34.9285;
 const ADELAIDE_LON = 138.6007;
 
+let stopData = [];
+let routeData = [];
 
-// Create the map
+const stopMarkers = {};
+
+let selectedLocationMarker = null;
+let selectedStopId = null;
+
+
+// --------------------------------------------------
+// MAP
+// --------------------------------------------------
+
 const map = L.map("map").setView(
     [ADELAIDE_LAT, ADELAIDE_LON],
-    14
+    13
 );
 
 
-// Add OpenStreetMap
 L.tileLayer(
     "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     {
@@ -34,8 +32,14 @@ L.tileLayer(
 
 
 // --------------------------------------------------
-// INTERFACE ELEMENTS
+// INTERFACE
 // --------------------------------------------------
+
+const routeSelect =
+    document.getElementById("routeSelect");
+
+const routePerformance =
+    document.getElementById("routePerformance");
 
 const locationButton =
     document.getElementById("locationButton");
@@ -43,246 +47,988 @@ const locationButton =
 const selectedLocationInfo =
     document.getElementById("selectedLocationInfo");
 
-const nearestStopContainer =
-    document.getElementById("nearestStop");
-
-const nearbyStopsContainer =
-    document.getElementById("nearbyStops");
-
 const selectedStopInfo =
     document.getElementById("selectedStopInfo");
 
 const stopCount =
     document.getElementById("stopCount");
 
+const routeCount =
+    document.getElementById("routeCount");
 
-// --------------------------------------------------
-// COORDINATE VALIDATION
-// --------------------------------------------------
-
-function hasValidCoordinates(stop) {
-
-    const latitude =
-        Number(stop.stop_lat);
-
-    const longitude =
-        Number(stop.stop_lon);
-
-
-    return (
-        Number.isFinite(latitude) &&
-        latitude >= -90 &&
-        latitude <= 90 &&
-        Number.isFinite(longitude) &&
-        longitude >= -180 &&
-        longitude <= 180
-    );
-}
+const mapMessage =
+    document.getElementById("mapMessage");
 
 
 // --------------------------------------------------
-// LOAD STOPS
+// START APPLICATION
 // --------------------------------------------------
 
-fetch("http://127.0.0.1:5000/api/stops")
+loadStops();
+loadRoutes();
 
-    .then(response => {
+
+// --------------------------------------------------
+// LOAD REAL STOP DATA FROM BACKEND
+// --------------------------------------------------
+
+async function loadStops() {
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE_URL}/api/stops`
+            );
+
 
         if (!response.ok) {
+
             throw new Error(
-                "Could not load stop data from backend."
+                "Unable to load stop data."
             );
         }
 
-        return response.json();
-    })
+
+        const stops =
+            await response.json();
 
 
-    .then(stops => {
+        if (!Array.isArray(stops)) {
 
-        const validStops =
-            stops.filter(stop => {
-
-                const valid =
-                    hasValidCoordinates(stop);
-
-
-                if (!valid) {
-
-                    console.warn(
-                        "Skipping stop with invalid coordinates:",
-                        stop
-                    );
-                }
-
-
-                return valid;
-            });
+            throw new Error(
+                "Invalid stop data returned by backend."
+            );
+        }
 
 
         stopData =
-            validStops.map(stop => ({
-
-                ...stop,
-
-                stop_lat:
-                    Number(stop.stop_lat),
-
-                stop_lon:
-                    Number(stop.stop_lon)
-
-            }));
+            stops
+                .filter(hasValidCoordinates)
+                .map(stop => ({
+                    ...stop,
+                    stop_lat:
+                        Number(stop.stop_lat),
+                    stop_lon:
+                        Number(stop.stop_lon)
+                }));
 
 
-        stopData.forEach(stop => {
-
-            const marker =
-                L.marker([
-                    stop.stop_lat,
-                    stop.stop_lon
-                ])
-                    .addTo(map);
-
-
-            stopMarkers[
-                stop.stop_id
-            ] = marker;
-
-
-            marker.bindPopup(`
-                <strong>${stop.stop_name}</strong><br>
-                Stop ID: ${stop.stop_id}<br>
-                Latitude: ${stop.stop_lat}<br>
-                Longitude: ${stop.stop_lon}
-            `);
-
-
-            marker.on(
-                "click",
-                () => {
-
-                    selectStop(stop);
-                }
-            );
-
-        });
+        createStopMarkers();
 
 
         stopCount.textContent =
-            `${stopData.length} stops loaded`;
+            `${stopData.length} stops`;
 
 
         if (stopData.length === 0) {
 
-            stopCount.textContent =
-                "No stops available";
+            showMapMessage(
+                "No stop data is currently available from the backend."
+            );
 
-            nearestStopContainer.innerHTML =
-                "<p>No valid stop data is currently available.</p>";
-
-            nearbyStopsContainer.innerHTML =
-                "<p>No valid stop data is currently available.</p>";
+            return;
         }
 
-    })
 
+        fitMapToStops();
 
-    .catch(error => {
+    }
+
+    catch (error) {
 
         console.error(
-            "Error loading stops:",
+            "Stop loading error:",
             error
         );
 
 
         stopCount.textContent =
-            "Stop data unavailable";
-
-        nearestStopContainer.innerHTML =
-            "<p>Unable to load stop data.</p>";
-
-        nearbyStopsContainer.innerHTML =
-            "<p>Unable to load stop data.</p>";
-    });
+            "Stops unavailable";
 
 
-// --------------------------------------------------
-// DISTANCE
-// --------------------------------------------------
-
-function calculateDistance(
-    lat1,
-    lon1,
-    lat2,
-    lon2
-) {
-
-    const earthRadius = 6371;
-
-    const latitude1 = Number(lat1);
-    const longitude1 = Number(lon1);
-    const latitude2 = Number(lat2);
-    const longitude2 = Number(lon2);
-
-
-    if (
-        !Number.isFinite(latitude1) ||
-        !Number.isFinite(longitude1) ||
-        !Number.isFinite(latitude2) ||
-        !Number.isFinite(longitude2)
-    ) {
-
-        return null;
-    }
-
-
-    const latDifference =
-        (latitude2 - latitude1) *
-        Math.PI / 180;
-
-
-    const lonDifference =
-        (longitude2 - longitude1) *
-        Math.PI / 180;
-
-
-    const a =
-        Math.sin(latDifference / 2) ** 2 +
-
-        Math.cos(
-            latitude1 * Math.PI / 180
-        ) *
-
-        Math.cos(
-            latitude2 * Math.PI / 180
-        ) *
-
-        Math.sin(lonDifference / 2) ** 2;
-
-
-    const c =
-        2 * Math.atan2(
-            Math.sqrt(a),
-            Math.sqrt(1 - a)
+        showMapMessage(
+            "Unable to load Adelaide Metro stops from the backend."
         );
-
-
-    return earthRadius * c;
+    }
 }
 
 
 // --------------------------------------------------
-// SELECT LOCATION
+// LOAD REAL ROUTE DATA FROM BACKEND
 // --------------------------------------------------
+
+async function loadRoutes() {
+
+    routeSelect.disabled = true;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE_URL}/api/routes`
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Unable to load route data."
+            );
+        }
+
+
+        const routes =
+            await response.json();
+
+
+        if (!Array.isArray(routes)) {
+
+            throw new Error(
+                "Invalid route data returned by backend."
+            );
+        }
+
+
+        routeData = routes;
+
+
+        populateRouteSelect();
+
+
+        routeCount.textContent =
+            `${routeData.length} routes`;
+
+
+        routeSelect.disabled =
+            false;
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Route loading error:",
+            error
+        );
+
+
+        routeCount.textContent =
+            "Routes unavailable";
+
+
+        routeSelect.innerHTML = `
+            <option value="">
+                Routes unavailable
+            </option>
+        `;
+    }
+}
+
+
+// --------------------------------------------------
+// STOP MARKERS
+// --------------------------------------------------
+
+function createStopMarkers() {
+
+    stopData.forEach(stop => {
+
+        const marker =
+            L.circleMarker(
+                [
+                    stop.stop_lat,
+                    stop.stop_lon
+                ],
+                {
+                    radius: 6,
+                    weight: 2,
+                    fillOpacity: 0.8
+                }
+            )
+                .addTo(map);
+
+
+        stopMarkers[
+            stop.stop_id
+        ] = marker;
+
+
+        marker.bindTooltip(
+            escapeHtml(
+                stop.stop_name
+            ),
+            {
+                direction: "top",
+                offset: [0, -5]
+            }
+        );
+
+
+        marker.bindPopup(`
+            <strong>
+                ${escapeHtml(stop.stop_name)}
+            </strong>
+            <br>
+            Stop ID:
+            ${escapeHtml(stop.stop_id)}
+            <br>
+            Latitude:
+            ${stop.stop_lat.toFixed(5)}
+            <br>
+            Longitude:
+            ${stop.stop_lon.toFixed(5)}
+        `);
+
+
+        marker.on(
+            "click",
+            () => {
+
+                selectStop(stop);
+            }
+        );
+    });
+}
+
+
+// --------------------------------------------------
+// ROUTE SELECT
+// --------------------------------------------------
+
+function populateRouteSelect() {
+
+    routeSelect.innerHTML = `
+        <option value="">
+            Select a route
+        </option>
+    `;
+
+
+    const sortedRoutes =
+        [...routeData].sort(
+            (a, b) => {
+
+                const nameA =
+                    a.route_short_name ||
+                    a.route_id;
+
+                const nameB =
+                    b.route_short_name ||
+                    b.route_id;
+
+
+                return String(nameA)
+                    .localeCompare(
+                        String(nameB),
+                        undefined,
+                        {
+                            numeric: true
+                        }
+                    );
+            }
+        );
+
+
+    sortedRoutes.forEach(route => {
+
+        const option =
+            document.createElement(
+                "option"
+            );
+
+
+        option.value =
+            route.route_id;
+
+
+        const shortName =
+            route.route_short_name ||
+            route.route_id;
+
+
+        const longName =
+            route.route_long_name
+                ? ` — ${route.route_long_name}`
+                : "";
+
+
+        option.textContent =
+            `${shortName}${longName}`;
+
+
+        routeSelect.appendChild(
+            option
+        );
+    });
+}
+
+
+routeSelect.addEventListener(
+    "change",
+    () => {
+
+        const routeId =
+            routeSelect.value;
+
+
+        if (!routeId) {
+
+            routePerformance.classList.add(
+                "empty-card"
+            );
+
+
+            routePerformance.innerHTML = `
+                <p>
+                    Select a route to view performance.
+                </p>
+            `;
+
+
+            resetStopMarkerEmphasis();
+
+            return;
+        }
+
+
+        selectRoute(routeId);
+    }
+);
+
+
+// --------------------------------------------------
+// SELECT ROUTE
+// --------------------------------------------------
+
+async function selectRoute(routeId) {
+
+    const route =
+        routeData.find(
+            item =>
+                String(item.route_id) ===
+                String(routeId)
+        );
+
+
+    routePerformance.classList.remove(
+        "empty-card"
+    );
+
+
+    routePerformance.innerHTML = `
+        <p>
+            Loading route performance...
+        </p>
+    `;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_BASE_URL}/api/routes/${encodeURIComponent(routeId)}/performance`
+            );
+
+
+        if (response.status === 404) {
+
+            displayRoutePerformance(
+                route,
+                null
+            );
+
+            return;
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "Unable to load route performance."
+            );
+        }
+
+
+        const performance =
+            await response.json();
+
+
+        displayRoutePerformance(
+            route,
+            performance
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Route performance error:",
+            error
+        );
+
+
+        routePerformance.innerHTML = `
+            <p>
+                Unable to load route performance.
+            </p>
+        `;
+    }
+}
+
+
+// --------------------------------------------------
+// DISPLAY ROUTE PERFORMANCE
+// --------------------------------------------------
+
+function displayRoutePerformance(
+    route,
+    performance
+) {
+
+    const routeName =
+        route
+            ? (
+                route.route_short_name ||
+                route.route_id
+            )
+            : "Selected route";
+
+
+    if (
+        !performance ||
+        performance.total_services === 0
+    ) {
+
+        routePerformance.innerHTML = `
+            <strong class="selected-stop-name">
+                ${escapeHtml(routeName)}
+            </strong>
+
+            <p class="detail-message">
+                No performance data is currently available for this route.
+            </p>
+        `;
+
+        return;
+    }
+
+
+    routePerformance.innerHTML = `
+        <strong class="selected-stop-name">
+            Route ${escapeHtml(routeName)}
+        </strong>
+
+        ${performanceMarkup(performance)}
+    `;
+}
+
+
+// --------------------------------------------------
+// SELECT STOP
+// --------------------------------------------------
+
+async function selectStop(stop) {
+
+    selectedStopId =
+        stop.stop_id;
+
+
+    selectedStopInfo.classList.remove(
+        "empty-card"
+    );
+
+
+    selectedStopInfo.innerHTML = `
+        <strong class="selected-stop-name">
+            ${escapeHtml(stop.stop_name)}
+        </strong>
+
+        <div class="selected-stop-id">
+            Stop ID:
+            ${escapeHtml(stop.stop_id)}
+        </div>
+
+        <div class="selected-stop-location">
+            ${stop.stop_lat.toFixed(5)},
+            ${stop.stop_lon.toFixed(5)}
+        </div>
+
+        <p class="detail-message">
+            Loading transport information...
+        </p>
+    `;
+
+
+    try {
+
+        const [
+            routeResponse,
+            performanceResponse
+        ] =
+            await Promise.all([
+                fetch(
+                    `${API_BASE_URL}/api/stops/${encodeURIComponent(stop.stop_id)}/routes`
+                ),
+
+                fetch(
+                    `${API_BASE_URL}/api/stops/${encodeURIComponent(stop.stop_id)}/performance`
+                )
+            ]);
+
+
+        if (!routeResponse.ok) {
+
+            throw new Error(
+                "Unable to load stop routes."
+            );
+        }
+
+
+        const routes =
+            await routeResponse.json();
+
+
+        let performance = null;
+
+
+        if (performanceResponse.ok) {
+
+            performance =
+                await performanceResponse.json();
+        }
+
+        else if (
+            performanceResponse.status !== 404
+        ) {
+
+            throw new Error(
+                "Unable to load stop performance."
+            );
+        }
+
+
+        if (
+            selectedStopId !==
+            stop.stop_id
+        ) {
+
+            return;
+        }
+
+
+        displayStopInformation(
+            stop,
+            routes,
+            performance
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Stop information error:",
+            error
+        );
+
+
+        if (
+            selectedStopId !==
+            stop.stop_id
+        ) {
+
+            return;
+        }
+
+
+        selectedStopInfo.innerHTML = `
+            <strong class="selected-stop-name">
+                ${escapeHtml(stop.stop_name)}
+            </strong>
+
+            <div class="selected-stop-id">
+                Stop ID:
+                ${escapeHtml(stop.stop_id)}
+            </div>
+
+            <p class="detail-message">
+                Unable to load transport information.
+            </p>
+        `;
+    }
+}
+
+
+// --------------------------------------------------
+// DISPLAY STOP INFORMATION
+// --------------------------------------------------
+
+function displayStopInformation(
+    stop,
+    routes,
+    performance
+) {
+
+    let routeMarkup = "";
+
+
+    if (
+        !Array.isArray(routes) ||
+        routes.length === 0
+    ) {
+
+        routeMarkup = `
+            <p class="detail-message">
+                No route information is available for this stop.
+            </p>
+        `;
+    }
+
+    else {
+
+        routes.forEach(route => {
+
+            const shortName =
+                route.route_short_name ||
+                route.route_id;
+
+
+            const longName =
+                route.route_long_name ||
+                "Route description unavailable";
+
+
+            routeMarkup += `
+                <div
+                    class="route-item"
+                    data-route-id="${escapeHtml(route.route_id)}"
+                >
+
+                    <span class="route-short-name">
+                        ${escapeHtml(shortName)}
+                    </span>
+
+                    <div class="route-long-name">
+                        ${escapeHtml(longName)}
+                    </div>
+
+                </div>
+            `;
+        });
+    }
+
+
+    let performanceMarkupContent;
+
+
+    if (
+        !performance ||
+        performance.total_services === 0
+    ) {
+
+        performanceMarkupContent = `
+            <p class="detail-message">
+                No performance data is currently available for this stop.
+            </p>
+        `;
+    }
+
+    else {
+
+        performanceMarkupContent =
+            performanceMarkup(
+                performance
+            );
+    }
+
+
+    selectedStopInfo.innerHTML = `
+        <strong class="selected-stop-name">
+            ${escapeHtml(stop.stop_name)}
+        </strong>
+
+        <div class="selected-stop-id">
+            Stop ID:
+            ${escapeHtml(stop.stop_id)}
+        </div>
+
+        <div class="selected-stop-location">
+            Location:
+            ${stop.stop_lat.toFixed(5)},
+            ${stop.stop_lon.toFixed(5)}
+        </div>
+
+
+        <div class="detail-heading">
+            Routes serving this stop
+        </div>
+
+        ${routeMarkup}
+
+
+        <div class="detail-heading">
+            Stop performance
+        </div>
+
+        ${performanceMarkupContent}
+    `;
+
+
+    selectedStopInfo
+        .querySelectorAll(
+            ".route-item[data-route-id]"
+        )
+        .forEach(element => {
+
+            element.style.cursor =
+                "pointer";
+
+
+            element.addEventListener(
+                "click",
+                () => {
+
+                    const routeId =
+                        element.dataset.routeId;
+
+
+                    routeSelect.value =
+                        routeId;
+
+
+                    selectRoute(
+                        routeId
+                    );
+                }
+            );
+        });
+}
+
+
+// --------------------------------------------------
+// PERFORMANCE MARKUP
+// --------------------------------------------------
+
+function performanceMarkup(
+    performance
+) {
+
+    const averageDelay =
+        formatNumber(
+            performance.average_delay
+        );
+
+
+    const onTime =
+        formatPercentage(
+            performance.on_time_percentage
+        );
+
+
+    const delayed =
+        formatPercentage(
+            performance.delayed_percentage
+        );
+
+
+    const severe =
+        formatPercentage(
+            performance.severe_delay_percentage
+        );
+
+
+    const early =
+        formatPercentage(
+            performance.early_percentage
+        );
+
+
+    return `
+        <div class="performance-card">
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    Services analysed
+                </span>
+
+                <span class="performance-value">
+                    ${escapeHtml(performance.total_services)}
+                </span>
+
+            </div>
+
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    Average delay
+                </span>
+
+                <span class="performance-value">
+                    ${averageDelay} min
+                </span>
+
+            </div>
+
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    On time
+                </span>
+
+                <span class="performance-value">
+                    ${onTime}
+                </span>
+
+            </div>
+
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    Delayed
+                </span>
+
+                <span class="performance-value">
+                    ${delayed}
+                </span>
+
+            </div>
+
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    Severe delay
+                </span>
+
+                <span class="performance-value">
+                    ${severe}
+                </span>
+
+            </div>
+
+
+            <div class="performance-row">
+
+                <span class="performance-label">
+                    Early
+                </span>
+
+                <span class="performance-value">
+                    ${early}
+                </span>
+
+            </div>
+
+        </div>
+    `;
+}
+
+
+// --------------------------------------------------
+// LOCATION SELECTION
+// --------------------------------------------------
+
+map.on(
+    "click",
+    event => {
+
+        setSelectedLocation(
+            event.latlng.lat,
+            event.latlng.lng,
+            "Selected on map"
+        );
+    }
+);
+
+
+locationButton.addEventListener(
+    "click",
+    () => {
+
+        if (!navigator.geolocation) {
+
+            selectedLocationInfo.innerHTML = `
+                <p>
+                    Location services are not supported by this browser.
+                </p>
+            `;
+
+            return;
+        }
+
+
+        locationButton.disabled =
+            true;
+
+
+        locationButton.textContent =
+            "Finding Location...";
+
+
+        navigator.geolocation.getCurrentPosition(
+
+            position => {
+
+                setSelectedLocation(
+                    position.coords.latitude,
+                    position.coords.longitude,
+                    "Current location"
+                );
+
+
+                map.setView(
+                    [
+                        position.coords.latitude,
+                        position.coords.longitude
+                    ],
+                    15
+                );
+
+
+                resetLocationButton();
+            },
+
+
+            error => {
+
+                console.error(
+                    "Geolocation error:",
+                    error
+                );
+
+
+                selectedLocationInfo.innerHTML = `
+                    <p>
+                        Unable to access your location.
+                    </p>
+                `;
+
+
+                resetLocationButton();
+            }
+        );
+    }
+);
+
 
 function setSelectedLocation(
     latitude,
     longitude,
-    sourceText
+    source
 ) {
 
-    const lat = Number(latitude);
-    const lon = Number(longitude);
+    const lat =
+        Number(latitude);
+
+    const lon =
+        Number(longitude);
 
 
     if (
@@ -290,17 +1036,8 @@ function setSelectedLocation(
         !Number.isFinite(lon)
     ) {
 
-        selectedLocationInfo.innerHTML =
-            "<p>Invalid location coordinates.</p>";
-
         return;
     }
-
-
-    selectedLocation = {
-        lat: lat,
-        lon: lon
-    };
 
 
     if (selectedLocationMarker) {
@@ -312,16 +1049,20 @@ function setSelectedLocation(
 
 
     selectedLocationMarker =
-        L.marker([
-            lat,
-            lon
-        ])
+        L.marker(
+            [lat, lon],
+            {
+                title: "Selected Location"
+            }
+        )
             .addTo(map)
             .bindPopup(`
-                <strong>Location A</strong><br>
-                ${sourceText}<br>
-                Latitude: ${lat.toFixed(5)}<br>
-                Longitude: ${lon.toFixed(5)}
+                <strong>Selected Location</strong>
+                <br>
+                ${escapeHtml(source)}
+                <br>
+                ${lat.toFixed(5)},
+                ${lon.toFixed(5)}
             `)
             .openPopup();
 
@@ -333,7 +1074,7 @@ function setSelectedLocation(
 
     selectedLocationInfo.innerHTML = `
         <span class="location-label">
-            ${sourceText}
+            ${escapeHtml(source)}
         </span>
 
         <div class="coordinate-row">
@@ -360,719 +1101,174 @@ function setSelectedLocation(
 
         </div>
     `;
-
-
-    findNearbyStops(
-        lat,
-        lon
-    );
 }
 
 
-// Click map
-map.on(
-    "click",
-    event => {
+function resetLocationButton() {
 
-        setSelectedLocation(
-            event.latlng.lat,
-            event.latlng.lng,
-            "Selected on map"
-        );
-    }
-);
+    locationButton.disabled =
+        false;
+
+
+    locationButton.textContent =
+        "Use My Location";
+}
 
 
 // --------------------------------------------------
-// BROWSER LOCATION
+// MAP HELPERS
 // --------------------------------------------------
 
-locationButton.addEventListener(
-    "click",
-    () => {
-
-        if (!navigator.geolocation) {
-
-            selectedLocationInfo.innerHTML =
-                "<p>Location services are not supported by this browser.</p>";
-
-            return;
-        }
-
-
-        locationButton.disabled = true;
-
-        locationButton.textContent =
-            "Finding Location...";
-
-
-        navigator.geolocation.getCurrentPosition(
-
-            position => {
-
-                const userLat =
-                    position.coords.latitude;
-
-                const userLon =
-                    position.coords.longitude;
-
-
-                setSelectedLocation(
-                    userLat,
-                    userLon,
-                    "Your current location"
-                );
-
-
-                map.setView(
-                    [
-                        userLat,
-                        userLon
-                    ],
-                    15
-                );
-
-
-                locationButton.disabled =
-                    false;
-
-                locationButton.textContent =
-                    "Use My Location";
-            },
-
-
-            error => {
-
-                console.error(
-                    "Location error:",
-                    error
-                );
-
-
-                selectedLocationInfo.innerHTML =
-                    "<p>Unable to access your location.</p>";
-
-
-                locationButton.disabled =
-                    false;
-
-                locationButton.textContent =
-                    "Use My Location";
-            }
-        );
-    }
-);
-
-
-// --------------------------------------------------
-// NEAREST STOPS
-// --------------------------------------------------
-
-function findNearbyStops(
-    userLat,
-    userLon
-) {
+function fitMapToStops() {
 
     if (stopData.length === 0) {
 
-        nearestStopContainer.innerHTML =
-            "<p>Stop data is still loading. Please try again.</p>";
-
-        nearbyStopsContainer.innerHTML =
-            "<p>Stop data is still loading. Please try again.</p>";
-
         return;
     }
 
 
-    const stopsWithDistance =
-        stopData
-
-            .map(stop => {
-
-                const distance =
-                    calculateDistance(
-                        userLat,
-                        userLon,
-                        stop.stop_lat,
-                        stop.stop_lon
-                    );
-
-
-                if (distance === null) {
-                    return null;
-                }
-
-
-                return {
-                    ...stop,
-                    distance: distance
-                };
-            })
-
-            .filter(
-                stop =>
-                    stop !== null
-            );
-
-
-    stopsWithDistance.sort(
-        (a, b) =>
-            a.distance - b.distance
-    );
-
-
-    if (stopsWithDistance.length === 0) {
-
-        nearestStopContainer.innerHTML =
-            "<p>No nearby stop could be calculated.</p>";
-
-        nearbyStopsContainer.innerHTML =
-            "<p>No nearby stops could be calculated.</p>";
-
-        return;
-    }
-
-
-    const nearestStop =
-        stopsWithDistance[0];
-
-
-    nearestStopContainer.classList.remove(
-        "empty-card"
-    );
-
-
-    nearestStopContainer.innerHTML = `
-        <strong class="nearest-stop-name">
-            ${nearestStop.stop_name}
-        </strong>
-
-        <div class="nearest-stop-id">
-            Stop ID: ${nearestStop.stop_id}
-        </div>
-
-        <span class="nearest-distance">
-            ${formatDistance(nearestStop.distance)}
-        </span>
-    `;
-
-
-    nearestStopContainer.style.cursor =
-        "pointer";
-
-
-    nearestStopContainer.onclick =
-        () => {
-
-            focusStop(
-                nearestStop
-            );
-        };
-
-
-    const otherNearbyStops =
-        stopsWithDistance.slice(1, 3);
-
-
-    nearbyStopsContainer.innerHTML = "";
-
-
-    if (otherNearbyStops.length === 0) {
-
-        nearbyStopsContainer.innerHTML =
-            "<p>No additional nearby stops available.</p>";
-
-        return;
-    }
-
-
-    otherNearbyStops.forEach(stop => {
-
-        const stopElement =
-            document.createElement(
-                "div"
-            );
-
-
-        stopElement.classList.add(
-            "nearby-stop"
+    const bounds =
+        L.latLngBounds(
+            stopData.map(
+                stop => [
+                    stop.stop_lat,
+                    stop.stop_lon
+                ]
+            )
         );
 
 
-        stopElement.innerHTML = `
-            <strong>
-                ${stop.stop_name}
-            </strong>
+    if (bounds.isValid()) {
 
-            <span>
-                ${formatDistance(stop.distance)}
-            </span>
-        `;
-
-
-        stopElement.addEventListener(
-            "click",
-            () => {
-
-                focusStop(stop);
+        map.fitBounds(
+            bounds,
+            {
+                padding: [30, 30],
+                maxZoom: 15
             }
         );
+    }
+}
 
 
-        nearbyStopsContainer.appendChild(
-            stopElement
-        );
+function resetStopMarkerEmphasis() {
+
+    Object.values(
+        stopMarkers
+    ).forEach(marker => {
+
+        marker.setStyle({
+            radius: 6,
+            weight: 2,
+            fillOpacity: 0.8
+        });
     });
 }
 
 
-// --------------------------------------------------
-// SELECT STOP
-// --------------------------------------------------
+function showMapMessage(message) {
 
-async function selectStop(stop) {
-
-    selectedStopInfo.classList.remove(
-        "empty-card"
-    );
+    mapMessage.textContent =
+        message;
 
 
-    selectedStopInfo.innerHTML = `
-        <strong class="selected-stop-name">
-            ${stop.stop_name}
-        </strong>
-
-        <div class="selected-stop-id">
-            Stop ID: ${stop.stop_id}
-        </div>
-
-        <p class="detail-message">
-            Loading transport information...
-        </p>
-    `;
-
-
-    try {
-
-        const routeRequest =
-            fetch(
-                `http://127.0.0.1:5000/api/stops/${encodeURIComponent(stop.stop_id)}/routes`
-            );
-
-
-        const performanceRequest =
-            fetch(
-                `http://127.0.0.1:5000/api/stops/${encodeURIComponent(stop.stop_id)}/performance`
-            );
-
-
-        const [
-            routeResponse,
-            performanceResponse
-        ] = await Promise.all([
-            routeRequest,
-            performanceRequest
-        ]);
-
-
-        if (!routeResponse.ok) {
-
-            throw new Error(
-                "Could not load route information."
-            );
-        }
-
-
-const routes =
-    await routeResponse.json();
-
-let performance = null;
-
-if (performanceResponse.ok) {
-
-    performance =
-        await performanceResponse.json();
-}
-
-else if (performanceResponse.status !== 404) {
-
-    throw new Error(
-        "Could not load performance information."
+    mapMessage.classList.remove(
+        "hidden"
     );
 }
 
 
+// --------------------------------------------------
+// VALIDATION
+// --------------------------------------------------
 
-        displayStopInformation(
-            stop,
-            routes,
-            performance
+function hasValidCoordinates(stop) {
+
+    const lat =
+        Number(stop.stop_lat);
+
+    const lon =
+        Number(stop.stop_lon);
+
+
+    const valid =
+        Number.isFinite(lat) &&
+        Number.isFinite(lon) &&
+        lat >= -90 &&
+        lat <= 90 &&
+        lon >= -180 &&
+        lon <= 180;
+
+
+    if (!valid) {
+
+        console.warn(
+            "Skipping stop with invalid coordinates:",
+            stop
         );
-
     }
 
-    catch (error) {
 
-        console.error(
-            "Error loading selected stop information:",
-            error
-        );
-
-
-        selectedStopInfo.innerHTML = `
-            <strong class="selected-stop-name">
-                ${stop.stop_name}
-            </strong>
-
-            <div class="selected-stop-id">
-                Stop ID: ${stop.stop_id}
-            </div>
-
-            <p class="detail-message">
-                Unable to load transport information.
-            </p>
-        `;
-    }
+    return valid;
 }
 
 
 // --------------------------------------------------
-// DISPLAY STOP INFORMATION
+// FORMATTERS
 // --------------------------------------------------
 
-function displayStopInformation(
-    stop,
-    routes,
-    performance
-) {
+function formatNumber(value) {
 
-    let routeContent = "";
+    const number =
+        Number(value);
 
 
-    if (
-        !Array.isArray(routes) ||
-        routes.length === 0
-    ) {
+    if (!Number.isFinite(number)) {
 
-        routeContent = `
-            <p class="detail-message">
-                No route information available for this stop.
-            </p>
-        `;
-    }
-
-    else {
-
-        routes.forEach(route => {
-
-            const shortName =
-                route.route_short_name ||
-                route.route_id;
-
-
-            const longName =
-                route.route_long_name ||
-                "Route name unavailable";
-
-
-            routeContent += `
-                <div class="route-item">
-
-                    <span class="route-short-name">
-                        ${shortName}
-                    </span>
-
-                    <div class="route-long-name">
-                        ${longName}
-                    </div>
-
-                </div>
-            `;
-        });
-    }
-
-
-   let performanceContent = "";
-
-
-if (
-    !performance ||
-    performance.total_services === 0
-) {
-
-    performanceContent = `
-        <p class="detail-message">
-            No performance data available for this stop.
-        </p>
-    `;
-}
-
-else {
-
-    const averageDelay =
-        Number(performance.average_delay);
-
-
-    const averageDelayText =
-        Number.isFinite(averageDelay)
-            ? `${averageDelay.toFixed(1)} min`
-            : "Unavailable";
-
-
-    performanceContent = `
-        <div class="performance-item">
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    Total services
-                </span>
-
-                <span class="performance-value">
-                    ${performance.total_services}
-                </span>
-            </div>
-
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    Average delay
-                </span>
-
-                <span class="performance-value">
-                    ${averageDelayText}
-                </span>
-            </div>
-
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    Early
-                </span>
-
-                <span class="performance-value">
-                    ${performance.early_count}
-                </span>
-            </div>
-
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    On time
-                </span>
-
-                <span class="performance-value">
-                    ${performance.on_time_count}
-                </span>
-            </div>
-
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    Delayed
-                </span>
-
-                <span class="performance-value">
-                    ${performance.delayed_count}
-                </span>
-            </div>
-
-
-            <div class="performance-row">
-                <span class="performance-label">
-                    Severely delayed
-                </span>
-
-                <span class="performance-value">
-                    ${performance.severely_delayed_count}
-                </span>
-            </div>
-
-        </div>
-    `;
-}
-
-
-    selectedStopInfo.innerHTML = `
-        <strong class="selected-stop-name">
-            ${stop.stop_name}
-        </strong>
-
-        <div class="selected-stop-id">
-            Stop ID: ${stop.stop_id}
-        </div>
-
-
-        <div class="detail-heading">
-            Routes serving this stop
-        </div>
-
-        ${routeContent}
-
-
-        <div class="detail-heading">
-            Performance
-        </div>
-
-        ${performanceContent}
-    `;
-}
-
-
-// --------------------------------------------------
-// FORMAT ARRIVAL TIME
-// --------------------------------------------------
-
-function formatArrivalTime(timestamp) {
-
-    if (!timestamp) {
         return "Unavailable";
     }
 
 
-    const date =
-        new Date(timestamp);
+    return number.toFixed(1);
+}
 
 
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
+function formatPercentage(value) {
 
-        return timestamp;
+    const number =
+        Number(value);
+
+
+    if (!Number.isFinite(number)) {
+
+        return "Unavailable";
     }
 
 
-    return date.toLocaleTimeString(
-        [],
-        {
-            hour: "2-digit",
-            minute: "2-digit"
+    return `${number.toFixed(1)}%`;
+}
+
+
+function escapeHtml(value) {
+
+    return String(
+        value ?? ""
+    ).replace(
+        /[&<>"']/g,
+        character => {
+
+            const replacements = {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "\"": "&quot;",
+                "'": "&#039;"
+            };
+
+
+            return replacements[
+                character
+            ];
         }
     );
-}
-
-
-// --------------------------------------------------
-// FORMAT DELAY
-// --------------------------------------------------
-
-function formatDelay(delaySeconds) {
-
-    const seconds =
-        Number(delaySeconds);
-
-
-    if (!Number.isFinite(seconds)) {
-
-        return "Delay unavailable";
-    }
-
-
-    if (seconds === 0) {
-
-        return "On time";
-    }
-
-
-    if (seconds > 0) {
-
-        if (seconds < 60) {
-
-            return `${seconds} sec late`;
-        }
-
-
-        const minutes =
-            Math.round(
-                seconds / 60
-            );
-
-
-        return `${minutes} min late`;
-    }
-
-
-    const earlySeconds =
-        Math.abs(seconds);
-
-
-    if (earlySeconds < 60) {
-
-        return `${earlySeconds} sec early`;
-    }
-
-
-    const earlyMinutes =
-        Math.round(
-            earlySeconds / 60
-        );
-
-
-    return `${earlyMinutes} min early`;
-}
-
-
-// --------------------------------------------------
-// FOCUS STOP
-// --------------------------------------------------
-
-function focusStop(stop) {
-
-    map.setView(
-        [
-            stop.stop_lat,
-            stop.stop_lon
-        ],
-        17
-    );
-
-
-    const marker =
-        stopMarkers[
-            stop.stop_id
-        ];
-
-
-    if (marker) {
-
-        marker.openPopup();
-    }
-
-
-    selectStop(stop);
-}
-
-
-// --------------------------------------------------
-// FORMAT DISTANCE
-// --------------------------------------------------
-
-function formatDistance(
-    distanceKm
-) {
-
-    if (
-        distanceKm === null ||
-        !Number.isFinite(distanceKm)
-    ) {
-
-        return "Distance unavailable";
-    }
-
-
-    if (distanceKm < 1) {
-
-        return `${
-            Math.round(
-                distanceKm * 1000
-            )
-        } m away`;
-    }
-
-
-    return `${
-        distanceKm.toFixed(2)
-    } km away`;
 }
