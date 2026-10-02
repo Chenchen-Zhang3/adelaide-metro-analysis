@@ -5,7 +5,7 @@ from pathlib import Path
 from backend.analysis.metrics import (
     average_delay,
     delayed_service_count,
-    delay_frequency,
+    delayed_rate,
     on_time_rate,
     early_arrival_rate,
     severe_delay_rate,
@@ -65,7 +65,7 @@ class TestAnalysisIntegration(unittest.TestCase):
         )
 
         self.assertEqual(
-            delay_frequency(delays_minutes),
+            delayed_rate(delays_minutes),
             50.0
         )
 

@@ -11,7 +11,7 @@ from backend.database.repository import (
 from backend.analysis.metrics import (
     average_delay,
     delayed_service_count,
-    delay_frequency,
+    delayed_rate,
     on_time_rate,
 )
 from backend.analysis.punctuality import classify_punctuality
@@ -85,7 +85,7 @@ class TestDatabaseAnalysisIntegration(unittest.TestCase):
         )
 
         self.assertEqual(
-            delay_frequency(delays_minutes),
+            delayed_rate(delays_minutes),
             50.0
         )
 
