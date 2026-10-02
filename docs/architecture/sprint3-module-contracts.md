@@ -82,6 +82,10 @@ The analysis module produces results such as:
 - on_time_count
 - delayed_count
 - severely_delayed_count
+-early_percentage
+-on_time_percentage
+-delayed_percentage
+-severe_delay_percentage
 
 These results can then be used by the backend API.
 
@@ -102,14 +106,15 @@ Current endpoints include:
 - `GET /api/routes/{route_id}/performance`
 - `GET /api/stops/{stop_id}/performance`
 
-The frontend uses these APIs to display:
+The frontend currently displays:
 
 - stop information
 - route information
-- nearby stops
-- performance information
+- route performance
+- stop performance
+- map-based location selection
 
-The frontend should not directly access the database.
+Nearest-stop distance calculation is planned for Sprint 4.
 
 ---
 
