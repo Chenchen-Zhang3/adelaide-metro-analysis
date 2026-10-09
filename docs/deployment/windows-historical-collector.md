@@ -92,15 +92,39 @@ Default environment values:
 
 | Variable | Default |
 | --- | --- |
-| `ADELAIDE_METRO_PYTHON` | `.venv\Scripts\python.exe` |
+| `ADELAIDE_METRO_PYTHON` | Optional full path; otherwise `.venv`, then `py -3.12`, then PATH `python.exe` |
 | `ADELAIDE_METRO_STATIC_GTFS_PATH` | `data\static_gtfs` |
 | `ADELAIDE_METRO_DATABASE_PATH` | `data\historical\adelaide_metro_history_v2.db` |
 | `ADELAIDE_METRO_LOG_PATH` | `logs\historical_collector.log` |
 | `ADELAIDE_METRO_POLLING_INTERVAL_SECONDS` | `60` |
 | `ADELAIDE_METRO_TRIP_UPDATE_CHECKPOINT_SECONDS` | `900` |
+| `ADELAIDE_METRO_PAUSE_ON_ERROR` | Unset; set `1` only for interactive troubleshooting |
 
 Set a variable before launching only when the CASR computer needs a different
 location. Do not place credentials in the batch file.
+
+Python selection order is an explicit `ADELAIDE_METRO_PYTHON` executable, the
+project's `.venv\Scripts\python.exe`, `py -3.12`, then the first `python.exe` on
+PATH. Every selected interpreter must report Python 3.12. An invalid explicit
+path or project environment fails visibly; it is not silently replaced. The
+launcher checks GTFS bindings, protobuf, tzdata and Adelaide timezone support
+before starting, and prints an install command for `requirements-collector.txt`
+when the runtime check fails. It never installs packages automatically.
+
+If VS Code works but the batch file does not, run `python -c "import sys;
+print(sys.executable)"` in the working VS Code Python environment and configure
+that full executable path in PowerShell:
+
+```powershell
+$env:ADELAIDE_METRO_PYTHON = 'C:\path\to\environment\Scripts\python.exe'
+.\scripts\start_historical_collector.bat --max-cycles 1
+```
+
+Run the batch file from an existing Command Prompt to keep its error visible.
+For interactive troubleshooting only, set `ADELAIDE_METRO_PAUSE_ON_ERROR=1`;
+leave it unset for Task Scheduler. The scheduled account must have the same
+interpreter path and environment configuration. Use the selected interpreter
+for the health-check and backup commands below if the project `.venv` is absent.
 
 ## 6. First smoke run
 
@@ -207,9 +231,10 @@ different access method.
 
 | Symptom | Check |
 | --- | --- |
-| Python not found | Confirm Python 3.12 and `.venv\Scripts\python.exe` exist. |
+| Python not found or wrong version | Check the printed interpreter; install Python 3.12 or set `ADELAIDE_METRO_PYTHON` to its full executable path. |
+| Runtime dependency check failed | Run the printed `requirements-collector.txt` install command with the selected interpreter. |
 | `stop_times.txt` not found | Confirm it is directly inside `data\static_gtfs`, or set `ADELAIDE_METRO_STATIC_GTFS_PATH`. |
-| Collector exits with code 2 | Check for another collector instance; also confirm the configured Python path exists. |
+| Exit code 2 | Launcher Python selection failure, or collector single-instance rejection; the printed error identifies the stage. |
 | No new rows | Check the log for feed errors; repeated feed snapshots may also be ignored as duplicates. |
 | Legacy historical database detected | Preserve the old file, set `ADELAIDE_METRO_DATABASE_PATH` to a new filename, then restart. |
 | Database locked | Confirm only one Task Scheduler account/session is running the collector. |
