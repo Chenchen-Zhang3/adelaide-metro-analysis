@@ -1,0 +1,9 @@
+{
+  "label": "Recorded Historical Data — September 2026",
+  "route_ids": ["G10", "M44", "506"],
+  "start": "2026-09-26T09:00:00+09:30",
+  "end_exclusive": "2026-09-26T11:00:00+09:30",
+  "static_feed_version": "1692",
+  "static_archive_sha256": "a964fda81ff3c76c7b9a89f4b14225b42bf4dc832b6b950957493552fa25906d",
+  "checkpoint_seconds": 900
+}
