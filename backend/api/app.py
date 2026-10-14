@@ -12,6 +12,10 @@ from backend.database.repository import (
     get_stop,
 )
 from backend.services.pipeline import query_and_analyse
+from backend.services.recorded_map_data import (
+    MapDataUnavailableError,
+    load_route_map_data,
+)
 
 
 app = Flask(__name__)
@@ -83,6 +87,18 @@ def get_route_performance(route_id):
         return jsonify({"error": "Route performance not found"}), 404
 
     return jsonify(performance)
+
+
+@app.get("/api/routes/<route_id>/map-data")
+def get_recorded_route_map_data(route_id):
+    """Return official shapes and related stops/trips for the recorded demo."""
+    try:
+        data = load_route_map_data(route_id)
+    except MapDataUnavailableError as error:
+        return jsonify({"error": str(error)}), 503
+    if data is None:
+        return jsonify({"error": "Recorded route map data not found"}), 404
+    return jsonify(data)
 
 
 @app.get("/api/stops/<stop_id>/performance")

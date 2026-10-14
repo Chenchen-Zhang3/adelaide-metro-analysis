@@ -1,0 +1,165 @@
+{
+  "label": "Recorded Historical Data — September 2026",
+  "static_feed_version": "1692",
+  "observation_window": {
+    "start": "2026-09-26T09:00:00+09:30",
+    "end_exclusive": "2026-09-26T11:00:00+09:30"
+  },
+  "demo_database": {
+    "name": "adelaide_metro_demo.db",
+    "bytes": 3858432,
+    "sha256": "735de9404b6fe46d52fe0b102004e6993815157b8f5905341afbf9cada465aa2"
+  },
+  "static": {
+    "feed_info": [
+      {
+        "feed_publisher_name": "Adelaide Metro",
+        "feed_publisher_url": "https://www.adelaidemetro.com.au/",
+        "feed_lang": "EN",
+        "feed_start_date": "20260820",
+        "feed_end_date": "20261011",
+        "feed_version": "1692"
+      }
+    ],
+    "files": {
+      "routes.txt": {
+        "name": "routes.txt",
+        "bytes": 180537,
+        "sha256": "921a3a72f22abc72f386f0ac9b4219bdc9b64cce8f1b8afa1b042b7e706e683b"
+      },
+      "trips.txt": {
+        "name": "trips.txt",
+        "bytes": 1179879,
+        "sha256": "ad0907053442d3afb280132298ecbb15cf0ebf30f9f10b4624947c151258d52c"
+      },
+      "stops.txt": {
+        "name": "stops.txt",
+        "bytes": 1468002,
+        "sha256": "f2c4b15268b3f395e73502a610492fbe503012e727a887f066c0a111ffc04c04"
+      },
+      "stop_times.txt": {
+        "name": "stop_times.txt",
+        "bytes": 51305489,
+        "sha256": "a8f87906b23bb661b45b1bcedf34f7f585b4ccf4d1265c56c36a41e16e8e3048"
+      },
+      "feed_info.txt": {
+        "name": "feed_info.txt",
+        "bytes": 167,
+        "sha256": "0383c68c9f14cf2ef9f7b46967db22c329b1a4f7253804590fdd95bfa80447cc"
+      }
+    },
+    "archive": {
+      "name": "google_transit.zip",
+      "bytes": 17350649,
+      "sha256": "a964fda81ff3c76c7b9a89f4b14225b42bf4dc832b6b950957493552fa25906d"
+    },
+    "shapes_file": {
+      "name": "shapes.txt",
+      "bytes": 40514418,
+      "sha256": "aac70302ec86924134dffb67e88a78112b7aaf8b93619d1cd72e244631b134d7"
+    }
+  },
+  "files": {
+    "route-shapes.geojson": {
+      "name": "route-shapes.geojson",
+      "bytes": 100143,
+      "sha256": "7b1b183c74e486d374fbb14f86108d4185147b1e77117d10811cf23fcfed41e5"
+    },
+    "stops.geojson": {
+      "name": "stops.geojson",
+      "bytes": 124931,
+      "sha256": "d6ccf9f9622bfb74fa0e5b16ddea1787ec07c92757caa5d92654ed22efa700cf"
+    },
+    "trip-map.json": {
+      "name": "trip-map.json",
+      "bytes": 127861,
+      "sha256": "b43927eebd4ffbb6a922d0c60e72fa6b4ae83b0d10dd15bd5c657aec935e8f3f"
+    }
+  },
+  "route_ids": [
+    "506",
+    "G10",
+    "M44"
+  ],
+  "trip_count": 55,
+  "stop_count": 354,
+  "shape_count": 8,
+  "feature_count": 8,
+  "shapes": {
+    "15144": {
+      "point_count": 517,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "15145": {
+      "point_count": 296,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "15150": {
+      "point_count": 568,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "16638": {
+      "point_count": 319,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "16782": {
+      "point_count": 448,
+      "repeated_coordinate_count": 19,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "16783": {
+      "point_count": 465,
+      "repeated_coordinate_count": 18,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "3240": {
+      "point_count": 463,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    },
+    "3246": {
+      "point_count": 453,
+      "repeated_coordinate_count": 0,
+      "adjacent_duplicate_count": 0,
+      "outside_broad_adelaide_bounds": 0
+    }
+  },
+  "route_shapes": {
+    "506": [
+      "3240",
+      "3246"
+    ],
+    "G10": [
+      "16638",
+      "16782",
+      "16783"
+    ],
+    "M44": [
+      "15144",
+      "15145",
+      "15150"
+    ]
+  },
+  "route_stop_counts": {
+    "506": 98,
+    "G10": 145,
+    "M44": 114
+  },
+  "coordinate_order": "GeoJSON [longitude, latitude]; use L.geoJSON directly",
+  "limitations": [
+    "Official full selected-trip shapes, not a time-clipped vehicle trajectory.",
+    "Repeated coordinates are preserved, not silently deduplicated.",
+    "Browser integration and playback are not claimed complete."
+  ]
+}
