@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from backend.database.repository import (
@@ -12,6 +12,7 @@ from backend.database.repository import (
     get_stop,
 )
 from backend.services.pipeline import query_and_analyse
+from backend.services.vehicle_history import query_vehicle_history
 from backend.services.recorded_map_data import (
     MapDataUnavailableError,
     load_route_map_data,
@@ -98,6 +99,18 @@ def get_recorded_route_map_data(route_id):
         return jsonify({"error": str(error)}), 503
     if data is None:
         return jsonify({"error": "Recorded route map data not found"}), 404
+    return jsonify(data)
+
+
+@app.get("/api/routes/<route_id>/vehicle-positions")
+def get_route_vehicle_history(route_id):
+    """Return a bounded page of recorded observations, not live vehicle state."""
+    try:
+        data = query_vehicle_history(route_id, **request.args.to_dict())
+    except (TypeError, ValueError) as error:
+        return jsonify({"error": str(error)}), 400
+    if data is None:
+        return jsonify({"error": "Route not found"}), 404
     return jsonify(data)
 
 
