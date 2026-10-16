@@ -67,6 +67,19 @@ The original demo database was unchanged after the check. Its SHA-256 remained:
 
 Result: PASS.
 
+
+## Regression Tests
+
+Command:
+
+    python -m pytest backend/tests tests -q
+
+Result: 245 passed, 1 warning in 47.81 seconds.
+
+The warning came from dateutil using the deprecated
+datetime.datetime.utcfromtimestamp() function. No tests failed.
+
+
 ## Evidence
 
 The check output is saved here:
@@ -81,7 +94,6 @@ The check output is saved here:
 - Test nearest-stop distance and delay hotspots.
 - Check the recorded-data label and the wording used for performance counts.
 - Check how the browser handles missing map data.
-- Run the automated regression tests.
 
 The demo uses recorded September data. It should not be presented as live data. The map tiles and Leaflet files may still require an internet connection.
 
