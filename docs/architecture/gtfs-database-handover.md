@@ -61,14 +61,20 @@ insert_trip_update(record)
 | `trip_id` | `str` | Yes | `trip_id TEXT NOT NULL` |
 | `route_id` | `str` | Yes | `route_id TEXT NOT NULL` |
 | `stop_id` | `str` | Yes | `stop_id TEXT NOT NULL` |
-| `scheduled_arrival` | ISO 8601 `str` with Adelaide offset, or `None` | No | `scheduled_arrival TEXT` |
-| `actual_arrival` | ISO 8601 `str` with Adelaide offset, or `None` | No | `actual_arrival TEXT` |
+| `scheduled_arrival` | ISO 8601 `str` with Adelaide offset | Yes | Converted to `scheduled_arrival INTEGER` |
+| `actual_arrival` | ISO 8601 `str` with Adelaide offset, or `None` | No | Validated, then derived rather than stored |
 | `delay_seconds` | `int` | Yes | `delay_seconds INTEGER NOT NULL` |
-| `timestamp` | ISO 8601 `str` with Adelaide offset, or `None` | No | `timestamp TEXT` |
+| `timestamp` | ISO 8601 `str` with Adelaide offset, or `None` | No | Converted to `observed_at INTEGER` |
 
 `delay_seconds` is the signed raw value `actual_arrival - scheduled_arrival`.
 Negative values (early) and zero (on time) are retained; classification belongs
 to analysis, not persistence.
+
+Repository queries reconstruct `actual_arrival` and return Adelaide ISO-8601
+timestamps, preserving the application-facing contract while the physical
+schema uses compact UTC epoch seconds. Unchanged prediction states are
+suppressed between periodic checkpoints; see
+`historical-storage-optimisation.md`.
 
 ## Static GTFS dependency
 
@@ -91,23 +97,22 @@ record.
 | Feed requests and transient request retries | `GTFSRealtimeClient` / `GTFSRealtimeCollector` | A retry-exhausted cycle is skipped by scheduled collection. |
 | Feed/entity and converter validation | `backend.realtime.validation`, converters and `historical_records` | Invalid or incomplete entities are skipped; valid entities in the same feed continue. |
 | Record-to-database handover | `persist_collection_result()` | Delegates the two database-ready lists without changing their fields. |
-| Duplicate handling | SQLite repository unique indexes plus `INSERT OR IGNORE` | Duplicate rows are ignored at insertion. |
+| Duplicate/change handling | Repository state table plus SQLite unique index | First, changed, checkpoint and reappearance states are stored; unchanged states are suppressed. |
 | Database errors and transaction policy | Repository/application integration layer | One transaction spans both record lists; SQLite failures are logged, rolled back and re-raised to the caller. |
 
 The processing pipeline must not retry database errors or implement a second
-deduplication scheme. A collection cycle containing invalid realtime entities
+change-detection scheme. A collection cycle containing invalid realtime entities
 can still persist its valid records. A SQLite persistence failure rolls back
 the whole collection-cycle transaction and remains visible to the caller.
 
 ## SCRUM-186 persistence behaviour
 
 `persist_realtime_collection()` begins one SQLite transaction for a completed
-collection cycle, writes Vehicle Positions and Trip Updates using the existing
-`INSERT OR IGNORE` statements, then commits only after both record lists have
-been processed. It returns received and inserted counts for each record type.
-It intentionally does not expose a duplicate count: SQLite `INSERT OR IGNORE`
-can ignore more than duplicate-key rows, so a duplicate-specific count would
-not be reliable.
+collection cycle. Vehicle Positions retain unique-index protection. Trip
+Updates are compared with persisted current state and classified as initial,
+changed, checkpoint, reappearance or suppressed before the transaction commits.
+The summary exposes stored and suppressed counts without labelling semantic
+suppression as a SQL duplicate.
 
 Connection/setup, Vehicle Position, Trip Update and commit failures are logged
 with their stage, trigger a rollback where a transaction exists, and preserve

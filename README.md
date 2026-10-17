@@ -132,6 +132,10 @@ The runner reuses the existing scheduled collector and collection-cycle SQLite
 transaction. Full setup, shutdown, restart and hosting guidance is in
 [Continuous Historical GTFS Collection Runner](docs/architecture/historical-collection-runner.md).
 
+For the CASR always-on Windows computer, use the
+[Windows Historical Collector Deployment Guide](docs/deployment/windows-historical-collector.md)
+and `scripts/start_historical_collector.bat`.
+
 Run full backend test discovery with:
 
 ```bash
@@ -218,6 +222,13 @@ data in a historical SQLite database.
 The collection runner processes Vehicle Positions and Trip Updates and
 preserves records across multiple collection cycles for later querying and
 analysis.
+
+Trip Updates use the storage-optimised schema: state changes are stored
+immediately, unchanged predictions receive periodic checkpoints, timestamps are
+stored internally as epoch integers, and `actual_arrival` is reconstructed from
+the schedule plus delay. See
+`docs/architecture/historical-storage-optimisation.md` for benchmarks and safe
+deployment guidance.
 
 ### Requirements
 

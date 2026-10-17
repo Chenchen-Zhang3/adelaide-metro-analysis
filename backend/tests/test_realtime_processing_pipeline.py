@@ -343,7 +343,7 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
                 )
                 vehicle = dict(cursor.fetchone())
                 cursor.execute(
-                    "SELECT trip_id, stop_id, delay_seconds, timestamp "
+                    "SELECT trip_id, stop_id, delay_seconds, observed_at "
                     "FROM trip_updates"
                 )
                 trip_update = dict(cursor.fetchone())
@@ -357,8 +357,8 @@ class TestGTFSRealtimeProcessingPipeline(unittest.TestCase):
             self.assertEqual(trip_update["stop_id"], "5281")
             self.assertEqual(trip_update["delay_seconds"], 470)
             self.assertEqual(
-                trip_update["timestamp"],
-                "2026-08-30T01:03:05+09:30",
+                trip_update["observed_at"],
+                1788017585,
             )
         finally:
             database_connection.DATABASE_PATH = original_database_path

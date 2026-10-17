@@ -1,0 +1,326 @@
+{
+  "generated_at_utc": "2026-10-14T06:30:14.226617+00:00",
+  "static": {
+    "directory": "D:\\Adelaide study\\2026\\ICT Capstone Project\\GTFS\\google_transit",
+    "files": {
+      "routes.txt": {
+        "name": "routes.txt",
+        "bytes": 180537,
+        "sha256": "921a3a72f22abc72f386f0ac9b4219bdc9b64cce8f1b8afa1b042b7e706e683b",
+        "rows": 731
+      },
+      "trips.txt": {
+        "name": "trips.txt",
+        "bytes": 1179879,
+        "sha256": "ad0907053442d3afb280132298ecbb15cf0ebf30f9f10b4624947c151258d52c",
+        "rows": 26250
+      },
+      "stops.txt": {
+        "name": "stops.txt",
+        "bytes": 1468002,
+        "sha256": "f2c4b15268b3f395e73502a610492fbe503012e727a887f066c0a111ffc04c04",
+        "rows": 9173
+      },
+      "stop_times.txt": {
+        "name": "stop_times.txt",
+        "bytes": 51305489,
+        "sha256": "a8f87906b23bb661b45b1bcedf34f7f585b4ccf4d1265c56c36a41e16e8e3048",
+        "rows": 971202,
+        "unique_trip_stop_pairs": 970460
+      },
+      "feed_info.txt": {
+        "name": "feed_info.txt",
+        "bytes": 167,
+        "sha256": "0383c68c9f14cf2ef9f7b46967db22c329b1a4f7253804590fdd95bfa80447cc"
+      },
+      "shapes.txt": {
+        "name": "shapes.txt",
+        "bytes": 40514418,
+        "sha256": "aac70302ec86924134dffb67e88a78112b7aaf8b93619d1cd72e244631b134d7"
+      }
+    },
+    "feed_info": [
+      {
+        "feed_publisher_name": "Adelaide Metro",
+        "feed_publisher_url": "https://www.adelaidemetro.com.au/",
+        "feed_lang": "EN",
+        "feed_start_date": "20260820",
+        "feed_end_date": "20261011",
+        "feed_version": "1692"
+      }
+    ],
+    "missing_files": [],
+    "diagnostics": {
+      "route_id_blank_records": 0,
+      "route_id_duplicate_records": 0,
+      "route_id_whitespace_records": 0,
+      "trip_id_blank_records": 0,
+      "trip_id_duplicate_records": 0,
+      "trip_id_whitespace_records": 0,
+      "stop_id_blank_records": 0,
+      "stop_id_duplicate_records": 0,
+      "stop_id_whitespace_records": 0,
+      "conflicting_trip_route_keys": 0
+    },
+    "archive": {
+      "name": "google_transit.zip",
+      "bytes": 17350649,
+      "sha256": "a964fda81ff3c76c7b9a89f4b14225b42bf4dc832b6b950957493552fa25906d"
+    },
+    "archive_file_matches": {
+      "routes.txt": true,
+      "trips.txt": true,
+      "stops.txt": true,
+      "stop_times.txt": true,
+      "feed_info.txt": true,
+      "shapes.txt": true
+    }
+  },
+  "history": {
+    "path": "D:\\Adelaide study\\2026\\ICT Capstone Project\\CASR historical data\\original\\adelaide_metro_history_20260928_165052.db",
+    "bytes": 6001827840,
+    "mtime_ns": 1790585379611427000,
+    "open_mode": "mode=ro; query_only=ON; consistent read transaction",
+    "source_metadata_unchanged": true,
+    "static_reference_table_rows": {
+      "routes": 0,
+      "trips": 0,
+      "stops": 0,
+      "stop_times": 0
+    }
+  },
+  "combined_ids": {
+    "route_id": {
+      "unique_realtime_ids": 380,
+      "missing_identifier_rows": 0,
+      "status": "checked",
+      "unique_static_ids": 731,
+      "matched_ids": 380,
+      "unmatched_ids": 0,
+      "match_percent": 100.0,
+      "matched_rows": 17231571,
+      "unmatched_rows": 0,
+      "unmatched_examples": [],
+      "whitespace_only_match_candidates": 0
+    },
+    "trip_id": {
+      "unique_realtime_ids": 18559,
+      "missing_identifier_rows": 0,
+      "status": "checked",
+      "unique_static_ids": 26250,
+      "matched_ids": 18559,
+      "unmatched_ids": 0,
+      "match_percent": 100.0,
+      "matched_rows": 17231571,
+      "unmatched_rows": 0,
+      "unmatched_examples": [],
+      "whitespace_only_match_candidates": 0
+    },
+    "stop_id": {
+      "unique_realtime_ids": 7328,
+      "missing_identifier_rows": 0,
+      "status": "checked",
+      "unique_static_ids": 9173,
+      "matched_ids": 7328,
+      "unmatched_ids": 0,
+      "match_percent": 100.0,
+      "matched_rows": 16547359,
+      "unmatched_rows": 0,
+      "unmatched_examples": [],
+      "whitespace_only_match_candidates": 0
+    }
+  },
+  "sources": {
+    "vehicle_positions": {
+      "status": "checked",
+      "physical_schema": "legacy_or_vehicle",
+      "rows": 684212,
+      "distinct_identifier_groups": 18350,
+      "timestamp_column": "timestamp",
+      "observation_span": [
+        "2026-09-25T16:27:05+09:30",
+        "2026-09-28T16:49:50+09:30"
+      ],
+      "normalisation_diagnostics": {},
+      "ids": {
+        "trip_id": {
+          "unique_realtime_ids": 18350,
+          "missing_identifier_rows": 0,
+          "status": "checked",
+          "unique_static_ids": 26250,
+          "matched_ids": 18350,
+          "unmatched_ids": 0,
+          "match_percent": 100.0,
+          "matched_rows": 684212,
+          "unmatched_rows": 0,
+          "unmatched_examples": [],
+          "whitespace_only_match_candidates": 0
+        },
+        "route_id": {
+          "unique_realtime_ids": 379,
+          "missing_identifier_rows": 0,
+          "status": "checked",
+          "unique_static_ids": 731,
+          "matched_ids": 379,
+          "unmatched_ids": 0,
+          "match_percent": 100.0,
+          "matched_rows": 684212,
+          "unmatched_rows": 0,
+          "unmatched_examples": [],
+          "whitespace_only_match_candidates": 0
+        }
+      },
+      "mapping_status": {
+        "trip_route": "checked",
+        "trip_stop": "not_applicable"
+      },
+      "mappings": {
+        "trip_route_consistent_groups": 18350,
+        "trip_route_consistent_rows": 684212
+      },
+      "mapping_examples": {}
+    },
+    "trip_updates": {
+      "status": "checked",
+      "physical_schema": "legacy_or_vehicle",
+      "rows": 16547359,
+      "distinct_identifier_groups": 678944,
+      "timestamp_column": "timestamp",
+      "observation_span": [
+        "2026-09-25T16:28:06+09:30",
+        "2026-09-28T16:49:06+09:30"
+      ],
+      "normalisation_diagnostics": {},
+      "ids": {
+        "trip_id": {
+          "unique_realtime_ids": 18343,
+          "missing_identifier_rows": 0,
+          "status": "checked",
+          "unique_static_ids": 26250,
+          "matched_ids": 18343,
+          "unmatched_ids": 0,
+          "match_percent": 100.0,
+          "matched_rows": 16547359,
+          "unmatched_rows": 0,
+          "unmatched_examples": [],
+          "whitespace_only_match_candidates": 0
+        },
+        "route_id": {
+          "unique_realtime_ids": 379,
+          "missing_identifier_rows": 0,
+          "status": "checked",
+          "unique_static_ids": 731,
+          "matched_ids": 379,
+          "unmatched_ids": 0,
+          "match_percent": 100.0,
+          "matched_rows": 16547359,
+          "unmatched_rows": 0,
+          "unmatched_examples": [],
+          "whitespace_only_match_candidates": 0
+        },
+        "stop_id": {
+          "unique_realtime_ids": 7328,
+          "missing_identifier_rows": 0,
+          "status": "checked",
+          "unique_static_ids": 9173,
+          "matched_ids": 7328,
+          "unmatched_ids": 0,
+          "match_percent": 100.0,
+          "matched_rows": 16547359,
+          "unmatched_rows": 0,
+          "unmatched_examples": [],
+          "whitespace_only_match_candidates": 0
+        }
+      },
+      "mapping_status": {
+        "trip_route": "checked",
+        "trip_stop": "checked"
+      },
+      "mappings": {
+        "trip_route_consistent_groups": 678944,
+        "trip_route_consistent_rows": 16547359,
+        "trip_stop_compatible_groups": 678944,
+        "trip_stop_compatible_rows": 16547359
+      },
+      "mapping_examples": {},
+      "demo_route_candidates": [
+        {
+          "route_id": "G10",
+          "trip_id": "1134894",
+          "stop_id": "100425",
+          "historical_rows": 495905,
+          "fully_compatible_rows": 495905
+        },
+        {
+          "route_id": "M44",
+          "trip_id": "945469",
+          "stop_id": "100256",
+          "historical_rows": 378955,
+          "fully_compatible_rows": 378955
+        },
+        {
+          "route_id": "H30",
+          "trip_id": "1028977",
+          "stop_id": "100232",
+          "historical_rows": 364553,
+          "fully_compatible_rows": 364553
+        },
+        {
+          "route_id": "506",
+          "trip_id": "1027468",
+          "stop_id": "100083",
+          "historical_rows": 291320,
+          "fully_compatible_rows": 291320
+        },
+        {
+          "route_id": "300",
+          "trip_id": "1134716",
+          "stop_id": "100000",
+          "historical_rows": 276354,
+          "fully_compatible_rows": 276354
+        },
+        {
+          "route_id": "178",
+          "trip_id": "1023784",
+          "stop_id": "100241",
+          "historical_rows": 268471,
+          "fully_compatible_rows": 268471
+        },
+        {
+          "route_id": "721",
+          "trip_id": "1090301",
+          "stop_id": "100011",
+          "historical_rows": 267880,
+          "fully_compatible_rows": 267880
+        },
+        {
+          "route_id": "GLNELG",
+          "trip_id": "1132160",
+          "stop_id": "100654",
+          "historical_rows": 267050,
+          "fully_compatible_rows": 267050
+        },
+        {
+          "route_id": "502",
+          "trip_id": "944350",
+          "stop_id": "1020",
+          "historical_rows": 232868,
+          "fully_compatible_rows": 232868
+        },
+        {
+          "route_id": "H20",
+          "trip_id": "1135124",
+          "stop_id": "101544",
+          "historical_rows": 215156,
+          "fully_compatible_rows": 215156
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Percentages describe stored history, not raw live feeds.",
+    "Collector enrichment can exclude unmatched raw Trip Updates before storage.",
+    "ID membership does not prove calendar/service-date or shape compatibility.",
+    "Feed coverage dates do not prove exact production feed version."
+  ]
+}

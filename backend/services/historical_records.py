@@ -37,7 +37,7 @@ def prepare_trip_update_record(trip_update):
         "trip_id": _required_string(trip_update, "trip_id"),
         "route_id": _required_string(trip_update, "route_id"),
         "stop_id": _required_string(trip_update, "stop_id"),
-        "scheduled_arrival": _optional_string(
+        "scheduled_arrival": _required_string(
             trip_update,
             "scheduled_arrival",
         ),

@@ -208,9 +208,30 @@ def test_pipeline_with_database(monkeypatch, tmp_path):
     assert route_result["average_delay"] == 8.5
 
 
-def test_run_collection_and_persist_repeats_cycles():
+def test_run_collection_and_persist_repeats_cycles(monkeypatch):
     # Store polling waits.
     waits = []
+
+    def fake_persist_collection_result(collection_result):
+        vehicle_positions = collection_result.get("vehicle_positions", [])
+        trip_updates = collection_result.get("trip_updates", [])
+
+        return {
+            "vehicle_positions_processed": len(vehicle_positions),
+            "trip_updates_processed": len(trip_updates),
+            "vehicle_positions_received": len(vehicle_positions),
+            "vehicle_positions_inserted": len(vehicle_positions),
+            "trip_updates_received": len(trip_updates),
+            "trip_updates_inserted": len(trip_updates),
+            "trip_updates_suppressed": 0,
+        }
+
+    monkeypatch.setattr(
+        pipeline,
+        "persist_collection_result",
+        fake_persist_collection_result,
+    )
+
 
     class FakeSettings:
         # Use a short test polling interval.
@@ -256,9 +277,29 @@ def test_run_collection_and_persist_repeats_cycles():
     assert waits == [15]
 
 
-def test_run_collection_and_persist_continues_after_retry_failure():
+def test_run_collection_and_persist_continues_after_retry_failure(monkeypatch):
     # Store polling waits.
     waits = []
+
+    def fake_persist_collection_result(collection_result):
+        vehicle_positions = collection_result.get("vehicle_positions", [])
+        trip_updates = collection_result.get("trip_updates", [])
+
+        return {
+            "vehicle_positions_processed": len(vehicle_positions),
+            "trip_updates_processed": len(trip_updates),
+            "vehicle_positions_received": len(vehicle_positions),
+            "vehicle_positions_inserted": len(vehicle_positions),
+            "trip_updates_received": len(trip_updates),
+            "trip_updates_inserted": len(trip_updates),
+            "trip_updates_suppressed": 0,
+        }
+
+    monkeypatch.setattr(
+        pipeline,
+        "persist_collection_result",
+        fake_persist_collection_result,
+    )
 
     class FakeSettings:
         # Use a short test polling interval.

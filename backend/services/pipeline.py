@@ -75,6 +75,9 @@ def run_collection_and_persist(
     Feed and SQLite failures make one collection cycle unsuccessful, but do not
     end the long-running historical collector. The next cycle still waits for
     the configured polling interval, avoiding a tight retry loop.
+
+    Bounded runs return all successful results. Continuous runs retain only the
+    latest successful result so feed payloads do not accumulate indefinitely.
     """
 
     # Reject an invalid cycle limit.
@@ -99,18 +102,23 @@ def run_collection_and_persist(
             # Collect and persist one cycle.
             result = collect_and_persist(collector)
 
-            # Keep the successful cycle result.
-            results.append(result)
+            # Unattended runs must not retain every historical feed in memory.
+            if max_cycles is None:
+                results[:] = [result]
+            else:
+                results.append(result)
 
             persistence_result = result["persistence_result"]
             logger.info(
                 "Completed historical GTFS collection cycle %d: "
-                "%d/%d vehicle positions and %d/%d trip updates inserted",
+                "%d/%d vehicle positions; %d/%d trip updates stored and "
+                "%d unchanged updates suppressed",
                 cycle_number,
                 persistence_result["vehicle_positions_inserted"],
                 persistence_result["vehicle_positions_received"],
                 persistence_result["trip_updates_inserted"],
                 persistence_result["trip_updates_received"],
+                persistence_result.get("trip_updates_suppressed", 0),
             )
 
         except GTFSRealtimeRetryExhaustedError:

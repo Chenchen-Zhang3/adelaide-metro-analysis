@@ -1,262 +1,149 @@
+
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1.0"
-    >
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adelaide Metro Transport Analysis</title>
-
-    <link
-        rel="stylesheet"
-        href="css/style.css"
-    >
-
-    <link
-        rel="stylesheet"
-        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    >
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 </head>
-
 <body>
-
     <header class="page-header">
-
         <div>
-            <h1>
-                Adelaide Metro Real-Time Transport Analysis
-            </h1>
-
-            <p>
-                Explore Adelaide Metro stops, accessibility and transport information.
-            </p>
+            <h1>Adelaide Metro Transport Analysis</h1>
+            <p>Explore Adelaide Metro stops, routes and transport performance.</p>
         </div>
-
     </header>
 
-
     <main class="app-layout">
-
         <aside class="sidebar">
-
             <div class="sidebar-heading">
-
-                <h2>
-                    Transport Explorer
-                </h2>
-
-                <p>
-                    Choose your current location or select a point directly on the map.
-                </p>
-
+                <h2>Transport Explorer</h2>
+                <p>Select a stop or route to investigate Adelaide Metro performance.</p>
             </div>
 
+            <section class="sidebar-section">
+                <div class="section-heading">
+                    <span class="section-number">1</span>
+                    <div>
+                        <h3>Select Route</h3>
+                        <p>Choose a route loaded from the backend.</p>
+                    </div>
+                </div>
+                <select id="routeSelect">
+                    <option value="">Loading routes...</option>
+                </select>
+            </section>
 
             <section class="sidebar-section">
-
                 <div class="section-heading">
-
-                    <span class="section-number">
-                        1
-                    </span>
-
+                    <span class="section-number">2</span>
                     <div>
-                        <h3>
-                            Select Location
-                        </h3>
+                        <h3>Route Performance</h3>
+                        <p>Performance statistics for the selected route.</p>
+                    </div>
+                </div>
+                <div id="routePerformance" class="info-card empty-card">
+                    <p>Select a route to view performance.</p>
+                </div>
+            </section>
 
-                        <p>
-                            Set Location A for nearby-stop calculations.
-                        </p>
+            <section class="sidebar-section">
+                <div class="section-heading">
+                    <span class="section-number">3</span>
+                    <div>
+                        <h3>Select Location</h3>
+                        <p>Find the nearest Adelaide Metro stop and its straight-line distance.</p>
+                    </div>
+                </div>
+                <button id="locationButton">Use My Location</button>
+                <p class="map-instruction">Or click anywhere on the map.</p>
+                <div id="selectedLocationInfo" class="info-card location-card empty-card">
+                    <p>No location selected.</p>
+                </div>
+            </section>
+
+            <section class="sidebar-section">
+                <div class="section-heading">
+                    <span class="section-number">4</span>
+                    <div>
+                        <h3>Selected Stop</h3>
+                        <p>Stop, route and delay information.</p>
+                    </div>
+                </div>
+                <div id="selectedStopInfo" class="info-card empty-card">
+                    <p>Select a stop marker to view information.</p>
+                </div>
+            </section>
+
+            <section class="sidebar-section">
+                <div class="section-heading">
+                    <span class="section-number">5</span>
+                    <div>
+                        <h3>Historical Vehicle Playback</h3>
+                        <p>Explore recorded vehicle movements over time.</p>
+                    </div>
+                </div>
+
+                <div class="info-card playback-card">
+                    <label for="playbackStart">Start time (Adelaide)</label>
+                    <input type="datetime-local" id="playbackStart"
+                           value="2026-09-26T09:00">
+
+                    <label for="playbackEnd">End time (Adelaide)</label>
+                    <input type="datetime-local" id="playbackEnd"
+                           value="2026-09-26T11:00">
+
+                    <button id="loadPlaybackButton" type="button">
+                        Load Vehicle History
+                    </button>
+
+                    <div class="playback-clock">
+                        <span>Playback time</span>
+                        <strong id="playbackTime">--:--:--</strong>
                     </div>
 
-                </div>
+                    <input type="range" id="playbackSlider"
+                           min="0" max="100" value="0" disabled>
 
-
-                <button id="locationButton">
-                    Use My Location
-                </button>
-
-
-                <p class="map-instruction">
-                    Or click anywhere on the map to select a location.
-                </p>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span class="section-number">
-                        2
-                    </span>
-
-                    <div>
-                        <h3>
-                            Selected Location
-                        </h3>
-
-                        <p>
-                            Coordinates currently used for analysis.
-                        </p>
+                    <div class="playback-buttons">
+                        <button id="playButton" type="button" disabled>Play</button>
+                        <button id="pauseButton" type="button" disabled>Pause</button>
+                        <button id="resetButton" type="button" disabled>Reset</button>
                     </div>
 
-                </div>
-
-
-                <div
-                    id="selectedLocationInfo"
-                    class="info-card empty-card"
-                >
-
-                    <p>
-                        No location selected yet.
+                    <p id="playbackStatus" class="playback-status" role="status">
+                        Select a route and load its recorded vehicle history.
                     </p>
 
-                </div>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span class="section-number">
-                        3
-                    </span>
-
-                    <div>
-                        <h3>
-                            Nearest Stop
-                        </h3>
-
-                        <p>
-                            Closest available Adelaide Metro stop.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="nearestStop"
-                    class="info-card empty-card"
-                >
-
-                    <p>
-                        Select a location to find the nearest stop.
+                    <p class="playback-note">
+                        Markers show the last recorded GPS position at or before
+                        the playback time. Movement between observations is not estimated.
+                        This is historical data, not live vehicle tracking.
                     </p>
-
                 </div>
-
             </section>
-
-
-            <section class="sidebar-section">
-
-                <h3 class="simple-section-heading">
-                    Other Nearby Stops
-                </h3>
-
-
-                <div
-                    id="nearbyStops"
-                    class="nearby-stops-card"
-                >
-
-                    <p>
-                        No location selected yet.
-                    </p>
-
-                </div>
-
-            </section>
-
-
-            <section class="sidebar-section">
-
-                <div class="section-heading">
-
-                    <span class="section-number">
-                        4
-                    </span>
-
-                    <div>
-                        <h3>
-                            Selected Stop
-                        </h3>
-
-                        <p>
-                            Routes and available performance information.
-                        </p>
-                    </div>
-
-                </div>
-
-
-                <div
-                    id="selectedStopInfo"
-                    class="info-card empty-card"
-                >
-
-                    <p>
-                        Select a stop to view transport information.
-                    </p>
-
-                </div>
-
-            </section>
-
         </aside>
 
-
         <section class="map-section">
-
             <div class="map-heading">
-
                 <div>
-
-                    <h2>
-                        Adelaide Map
-                    </h2>
-
-                    <p>
-                        Select a stop marker for details or click the map to choose Location A.
-                    </p>
-
+                    <h2>Adelaide Network Map</h2>
+                    <p>Click a stop for details, or click the map to select a location.</p>
                 </div>
-
-
-                <div
-                    id="stopCount"
-                    class="stop-count"
-                >
-                    Loading stops...
+                <div class="map-status">
+                    <span id="stopCount" class="status-pill">Loading stops...</span>
+                    <span id="routeCount" class="status-pill">Loading routes...</span>
                 </div>
-
             </div>
 
-
+            <div id="mapMessage" class="map-message hidden" role="status"></div>
             <div id="map"></div>
-
         </section>
-
     </main>
 
-
-    <script
-        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    ></script>
-
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="js/map.js"></script>
-
 </body>
-
 </html>

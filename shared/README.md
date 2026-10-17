@@ -18,6 +18,7 @@ Current schemas:
 - `trip-update.schema.json`
 - `vehicle.schema.json`
 - `stop-time.schema.json`
+- `recorded-route-map.schema.json` — recorded demo GeoJSON plus trip/stop relationships.
 
 ### constants/
 
