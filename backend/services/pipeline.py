@@ -207,6 +207,7 @@ def query_and_analyse(
     stop_id=None,
     start_time=None,
     end_time=None,
+        min_services=10,
 ):
     """Query stored records and prepare delay analysis."""
 
@@ -222,4 +223,7 @@ def query_and_analyse(
     analysis_records = prepare_analysis_records(records)
 
     # Return aggregated analysis results.
-    return prepare_analysis_output(analysis_records)
+    return prepare_analysis_output(
+    analysis_records,
+    min_services=min_services,
+)

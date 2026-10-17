@@ -1,4 +1,7 @@
+
 """Functions for calculating transport performance metrics."""
+
+from .punctuality import classify_punctuality
 
 
 def average_delay(delays):
@@ -9,45 +12,60 @@ def average_delay(delays):
     return sum(delays) / len(delays)
 
 
+def average_positive_delay(delays):
+    """Return average delay among late arrivals only."""
+    positive_delays = [d for d in delays if d > 0]
+
+    if not positive_delays:
+        return 0.0
+
+    return sum(positive_delays) / len(positive_delays)
+
+
 def delayed_service_count(delays, threshold=5):
-    """Count services delayed by more than the threshold."""
-    return sum(delay > threshold for delay in delays)
+    """Count all services delayed beyond the threshold."""
+    return sum(d > threshold for d in delays)
+
+
+def total_late_count(delays):
+    """Count delayed and severely delayed services."""
+    return sum(d > 5 for d in delays)
 
 
 def delayed_rate(delays):
-    """Return percentage of delayed services (>5 and <=10 minutes)."""
+    """Percentage of services classified as Delayed."""
     if not delays:
         return 0.0
 
-    delayed = sum(5 < delay <= 10 for delay in delays)
+    count = sum(
+        classify_punctuality(d) == "Delayed"
+        for d in delays
+    )
+    return count / len(delays) * 100
 
-    return (delayed / len(delays)) * 100
 
 def on_time_rate(delays, threshold=5):
-    """Return the percentage of services that are on time."""
+    """Percentage of arrivals between 0 and threshold."""
     if not delays:
         return 0.0
 
-    on_time = sum(0 <= delay <= threshold for delay in delays)
-
-    return (on_time / len(delays)) * 100
+    count = sum(0 <= d <= threshold for d in delays)
+    return count / len(delays) * 100
 
 
 def early_arrival_rate(delays):
-    """Return the percentage of services arriving early."""
+    """Percentage of services arriving early."""
     if not delays:
         return 0.0
 
-    early = sum(delay < 0 for delay in delays)
-
-    return (early / len(delays)) * 100
+    count = sum(d < 0 for d in delays)
+    return count / len(delays) * 100
 
 
 def severe_delay_rate(delays, threshold=10):
-    """Return the percentage of severely delayed services."""
+    """Percentage of services delayed more than threshold."""
     if not delays:
         return 0.0
 
-    severe = sum(delay > threshold for delay in delays)
-
-    return (severe / len(delays)) * 100
+    count = sum(d > threshold for d in delays)
+    return count / len(delays) * 100

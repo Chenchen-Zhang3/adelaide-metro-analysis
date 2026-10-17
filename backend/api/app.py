@@ -2,7 +2,7 @@
 
 import sqlite3
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from backend.database.repository import (
@@ -97,3 +97,38 @@ def get_stop_performance(stop_id):
         return jsonify({"error": "Stop performance not found"}), 404
 
     return jsonify(performance)
+
+@app.get("/api/analysis/hotspots")
+def get_delay_hotspots():
+    """Return historical delay hotspots."""
+
+    try:
+        min_services = request.args.get(
+            "min_services", default=10, type=int
+        )
+
+        if min_services < 1:
+            return jsonify({
+                "error": "min_services must be positive"
+            }), 400
+
+        route_id = request.args.get("route_id")
+        stop_id = request.args.get("stop_id")
+        start_time = request.args.get("start_time")
+        end_time = request.args.get("end_time")
+
+        analysis = query_and_analyse(
+            route_id=route_id,
+            stop_id=stop_id,
+            start_time=start_time,
+            end_time=end_time,
+            min_services=min_services,
+        )
+
+        return jsonify({
+            "hotspots": analysis["delay_hotspots"],
+            "total_hotspots": len(analysis["delay_hotspots"]),
+        })
+
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
