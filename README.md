@@ -220,6 +220,7 @@ data/
 └── history/
     └── adelaide_metro_history.db
 ```
+
 Run One Collection Cycle
 
 ```bash
@@ -256,7 +257,7 @@ Stored Vehicle Position records can be queried by:
 These query interfaces support historical transport analysis and provide a
 foundation for later vehicle playback functionality.
 
-Testing
+### Testing
 
 Sprint 3 database integration is covered by automated repository, persistence,
 pipeline and realtime processing integration tests.

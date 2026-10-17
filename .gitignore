@@ -222,3 +222,7 @@ __marimo__/
 *.sqlite3
 
 data/static_gtfs/
+
+# Local GTFS data
+data/static_gtfs/
+data/history/
