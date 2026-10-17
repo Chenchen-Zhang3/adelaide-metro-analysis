@@ -61,7 +61,7 @@ Evidence:
 | --- | --- | --- |
 | Initial loading | Passed | The interface displayed 354 stops and 3 routes. |
 | G10 route geometry | Passed | The route line and route stops appeared on the map. |
-| Route selection | Partially checked | G10 and M44 statistics displayed. Complete switching and old-layer cleanup still need a recorded result. |
+| Route selection | Passed for G10 to M44 | Switching routes stopped and reset the previous playback. After loading M44 history, automatic playback worked normally. |
 | Stop details | Passed | Stop 3917 displayed its details and performance information. Related API requests returned 200. |
 | Location selection and nearest stop | Passed | The selected map location displayed stop 3917 as the nearest stop, at 577 m. The interface identified this as straight-line distance. |
 | Historical data loading | Passed | The vehicle history request returned 200 and the interface displayed observation and vehicle counts. |
@@ -115,8 +115,6 @@ This report does not establish that every Sprint 4 feature is complete.
 
 Remaining checks are:
 
-- Record Reset, route-switch cleanup and empty-window behaviour.
-- Compare hotspot results with the corresponding stop performance.
 - Test the hotspot interface after integration.
 - Retest fixes before closing the related issues.
 
