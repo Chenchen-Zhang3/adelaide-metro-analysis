@@ -4,28 +4,36 @@ This repository contains the prototype developed for the Adelaide Metro Real-Tim
 
 The project is being developed for CASR researchers to support the collection, storage, exploration and analysis of Adelaide Metro GTFS and GTFS-Realtime data.
 
-## Sprint 1 and Sprint 2 Status
+## Current Prototype Status — Sprint 4
 
-Sprint 1 established the technical foundation. Sprint 2 adds a reusable
-GTFS-Realtime ingestion and processing workflow.
+The prototype collects and stores Adelaide Metro GTFS-Realtime data
+and provides a browser interface for exploring recorded transport data.
 
-The current prototype includes:
+The current implementation includes:
 
-- Static GTFS parsing for stops, routes, trips and stop times
-- GTFS-Realtime client and protobuf decoding
-- Conversion into agreed shared GTFS structures
-- Basic SQLite database storage and retrieval
-- Delay and punctuality analysis functions
-- Adelaide map prototype using Leaflet and OpenStreetMap
-- Shared JSON schemas and sample GTFS datasets
-- Sample data validation
-- Backend unit testing
-- Database and analysis integration testing
-- Configurable GTFS-Realtime collection settings
-- Scheduled Vehicle Position and Trip Update collection with bounded retry
-- Record validation, database-ready historical mapping and delay handling
-- Standard logging and a reusable realtime processing pipeline
-- Continuous historical GTFS-Realtime collection with transactional persistence
+- Static GTFS parsing and shared data structures.
+- Vehicle Position and Trip Update collection with SQLite persistence.
+- Historical queries by route, stop, vehicle and time range.
+- Storage optimisation for repeated Trip Update observations.
+- Route and stop performance APIs.
+- A delay-hotspot backend endpoint.
+- A Leaflet map with route geometry and stop selection.
+- Nearest-stop lookup using straight-line distance.
+- Historical vehicle playback with time selection and playback controls.
+
+The collector has been deployed on a CASR Windows computer.
+Automatic restart after a power interruption still needs confirmation.
+
+The Sprint 4 demo uses recorded data from 26 September 2026,
+09:00–11:00 Adelaide time, for routes G10, M44 and 506.
+The browser demo is not a live feed.
+
+The hotspot interface has not yet been integrated into the frontend.
+Further verification is needed as the remaining features are completed.
+
+For local data placement, dependency installation, startup commands
+and known issues, follow the
+[Sprint 4 Demo Setup and Risks](docs/integration/sprint4-demo-setup-and-risks.md).
 
 ## Project Structure
 
@@ -109,6 +117,23 @@ The validation checks the sample datasets against the shared schemas and also ch
 
 ## Backend Tests
 
+
+Run the backend and project test suites from the project root:
+
+```powershell
+python -m pytest backend/tests tests -q
+```
+
+If pytest is not installed in the active Python environment, install it first:
+
+```powershell
+python -m pip install pytest
+```
+
+For the recorded-data integration check, see the
+[Sprint 4 Browser and Backend Verification Report](docs/testing/sprint4-browser-and-backend-verification-20261017.md).
+
+
 Run the original Sprint 1 backend tests using:
 
 ```bash
@@ -170,48 +195,60 @@ The integration layer converts `delay_seconds` into minutes before passing delay
 
 ## Frontend
 
-The Sprint 1 frontend uses Leaflet and OpenStreetMap.
+The frontend uses Leaflet and OpenStreetMap and connects to the local
+Flask backend for route, stop, performance and vehicle-history data.
 
-Start a local server from the project root:
+Before starting the application, follow the
+[Sprint 4 Demo Setup and Risks](docs/integration/sprint4-demo-setup-and-risks.md)
+to install dependencies, place the six required local data files
+and configure the backend data paths.
 
-```bash
+Start the backend using the commands in that guide.
+Keep the backend terminal running.
+
+Open a second terminal in the project root and start the frontend server:
+
+```powershell
 python -m http.server 8000
 ```
 
-Then open:
+Open <http://127.0.0.1:8000/frontend/>.
 
-```text
-http://localhost:8000/frontend/index.html
-```
+Both servers must remain running while using the application.
+Starting the frontend server alone does not start the backend.
 
-The current frontend can display the sample CBD stops using the shared stop structure.
+Leaflet and basemap tiles require internet access or cached resources.
+
 
 ## Current Limitations
 
-The current prototype is an initial technical foundation and is not the final system.
+- The demo uses a fixed recorded dataset rather than a live browser feed.
+- The delay-hotspot endpoint is available, but the hotspot frontend is not yet integrated.
+- Nearest-stop distance is straight-line distance, not road-network distance.
+- Performance counts represent retained prediction observations, not unique completed services.
+- Some interface labels and the map/control layout still need improvement.
+- Leaflet and basemap tiles depend on online or cached resources.
+- Browser geolocation depends on browser permissions and operating system settings.
+- Automatic collector restart after a power interruption on the CASR computer has not been confirmed.
+- The latest CASR database backup and long-term storage growth still need follow-up.
+- Service Alerts do not yet have a historical persistence contract.
+- Production monitoring and alerting are not yet configured.
 
-Current limitations include:
+Local verification results and outstanding issues are recorded in the
+[Sprint 4 Browser and Backend Verification Report](docs/testing/sprint4-browser-and-backend-verification-20261017.md).
 
-- A deployment host is still required to run continuous GTFS-Realtime collection
-- Service Alerts do not yet have a historical persistence contract
-- Production monitoring and alerting are not yet configured
-- More detailed delay and route analysis will be added later
-- The current nearby-stop prototype uses straight-line distance
-- Road-network distance is not yet implemented
-- Browser geolocation may depend on local browser and operating system settings
-- Final punctuality boundary rules still require client confirmation
 
 ## Next Steps
 
-Later sprints will focus on:
+- Integrate the hotspot endpoint into the frontend and test the displayed results.
+- Clarify performance metric labels and recorded-data information.
+- Improve the map and control layout for browser use and screen sharing.
+- Retest reported issues after fixes are merged.
+- Review the remaining features and acceptance criteria with the client.
+- Follow up on the CASR collector restart setup, database backup and storage growth.
+- Keep setup, API and data preparation documentation consistent with the tested version.
+- Prepare the final demonstration and project handover.
 
-- Connecting more components to real Adelaide Metro data
-- Historical GTFS-Realtime storage
-- Historical querying
-- Expanded delay and punctuality analysis
-- Route and time-period analysis
-- Further map and accessibility integration
-- More complete system integration and testing
 
 
 ## Historical GTFS-Realtime Collection
