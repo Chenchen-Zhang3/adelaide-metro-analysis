@@ -491,3 +491,68 @@ def test_unknown_endpoint():
     assert response.get_json() == {
         "error": "Endpoint not found"
     }
+
+def test_get_delay_hotspots(monkeypatch):
+    sample_hotspots = [
+        {
+            "stop_id": "STOP_001",
+            "total_services": 20,
+            "average_delay": 8.5,
+        }
+    ]
+
+    def mock_query_and_analyse(**kwargs):
+        assert kwargs["min_services"] == 10
+        return {"delay_hotspots": sample_hotspots}
+
+    monkeypatch.setattr(
+        "backend.api.app.query_and_analyse",
+        mock_query_and_analyse,
+    )
+
+    client = app.test_client()
+    response = client.get("/api/analysis/hotspots")
+
+    assert response.status_code == 200
+    assert response.get_json() == {
+        "hotspots": sample_hotspots,
+        "total_hotspots": 1,
+    }
+
+
+def test_get_delay_hotspots_invalid_min_services():
+    client = app.test_client()
+
+    response = client.get(
+        "/api/analysis/hotspots?min_services=0"
+    )
+
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_get_delay_hotspots_filters(monkeypatch):
+    captured = {}
+
+    def mock_query_and_analyse(**kwargs):
+        captured.update(kwargs)
+        return {"delay_hotspots": []}
+
+    monkeypatch.setattr(
+        "backend.api.app.query_and_analyse",
+        mock_query_and_analyse,
+    )
+
+    client = app.test_client()
+    response = client.get(
+        "/api/analysis/hotspots"
+        "?route_id=G10"
+        "&stop_id=STOP_001"
+        "&min_services=5"
+    )
+
+    assert response.status_code == 200
+    assert captured["route_id"] == "G10"
+    assert captured["stop_id"] == "STOP_001"
+    assert captured["min_services"] == 5
+    assert response.get_json()["total_hotspots"] == 0

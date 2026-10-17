@@ -90,7 +90,10 @@ def test_validate_analysis_with_sample_data():
         },
     ]
 
-    result = prepare_analysis_output(sample_records)
+    result = prepare_analysis_output(
+    sample_records,
+    min_services=2,
+)
 
     # Validate route-level results
     assert result["route_performance"]["R1"]["total_services"] == 2
