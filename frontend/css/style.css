@@ -3,7 +3,8 @@
     box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
     margin: 0;
     min-height: 100%;
 }
@@ -30,6 +31,52 @@ body {
     margin: 0;
     color: #667085;
     font-size: 14px;
+}
+
+/* Keep the sidebar and map visible together */
+@media (min-width: 901px) {
+    html,
+    body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    body {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .page-header {
+        flex-shrink: 0;
+    }
+
+    .app-layout {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        flex: 1;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        height: 100%;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .map-section {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    #map {
+        flex: 1;
+        height: auto;
+        min-height: 0;
+    }
 }
 
 .app-layout {
@@ -448,14 +495,31 @@ body {
     line-height: 1.5;
 }
 
+/* Stack the sidebar and map on smaller screens */
 @media (max-width: 900px) {
+    html,
+    body {
+        height: auto;
+        overflow: auto;
+    }
+
     .app-layout {
+        display: grid;
         grid-template-columns: 1fr;
+        min-height: 0;
+        overflow: visible;
     }
 
     .sidebar {
+        height: auto;
+        overflow: visible;
         border-right: none;
         border-bottom: 1px solid #e4e7ec;
+    }
+
+    .map-section {
+        display: block;
+        overflow: visible;
     }
 
     .map-heading {
@@ -474,5 +538,17 @@ body {
     .sidebar,
     .map-section {
         padding: 16px;
+    }
+}
+
+/* Apply the desktop scrolling layout after the base styles */
+@media (min-width: 901px) {
+    .app-layout {
+        min-height: 0;
+    }
+
+    #map {
+        height: auto;
+        min-height: 0;
     }
 }
