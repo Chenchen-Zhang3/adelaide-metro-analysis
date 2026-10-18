@@ -3,9 +3,43 @@ const API_BASE_URL = "http://127.0.0.1:5000";
 const ADELAIDE_LAT = -34.9285;
 const ADELAIDE_LON = 138.6007;
 
+const map = L.map("map").setView([ADELAIDE_LAT, ADELAIDE_LON], 13);
+
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors"
+}).addTo(map);
+
+const element = id => document.getElementById(id);
+
+const routeSelect = element("routeSelect");
+const routePerformance = element("routePerformance");
+const locationButton = element("locationButton");
+const selectedLocationInfo = element("selectedLocationInfo");
+const selectedStopInfo = element("selectedStopInfo");
+const stopCount = element("stopCount");
+const routeCount = element("routeCount");
+const mapMessage = element("mapMessage");
+
+const playbackStart = element("playbackStart");
+const playbackEnd = element("playbackEnd");
+const loadPlaybackButton = element("loadPlaybackButton");
+const playbackTime = element("playbackTime");
+const playbackSlider = element("playbackSlider");
+const playbackStatus = element("playbackStatus");
+const playButton = element("playButton");
+const pauseButton = element("pauseButton");
+const resetButton = element("resetButton");
+
+const hotspotToggle = element("hotspotToggle");
+const hotspotMinServices = element("hotspotMinServices");
+const hotspotStatus = element("hotspotStatus");
+const hotspotResults = element("hotspotResults");
+
 let stopData = [];
 let routeData = [];
-const stopMarkers = {};
+
+const stopMarkers = new Map();
 
 let selectedLocation = null;
 let selectedLocationMarker = null;
@@ -16,6 +50,8 @@ let routeGeometryLayer = null;
 let routeStopLayer = null;
 let routeMapRequest = 0;
 let routePerformanceRequest = 0;
+
+const vehicleLayer = L.layerGroup().addTo(map);
 
 let recordedPositions = [];
 let playbackStartTime = null;
@@ -28,38 +64,99 @@ let playbackRequestId = 0;
 const PLAYBACK_STEP_SECONDS = 30;
 const PLAYBACK_INTERVAL_MS = 500;
 
-const map = L.map("map").setView([ADELAIDE_LAT, ADELAIDE_LON], 13);
+let hotspotData = [];
+let hotspotLayer = null;
+let hotspotRequest = 0;
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19,
-    attribution: "&copy; OpenStreetMap contributors"
-}).addTo(map);
+// Basic formatting helpers
+function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, character => {
+        const replacements = {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#039;"
+        };
 
-const routeSelect = document.getElementById("routeSelect");
-const routePerformance = document.getElementById("routePerformance");
-const locationButton = document.getElementById("locationButton");
-const selectedLocationInfo = document.getElementById("selectedLocationInfo");
-const selectedStopInfo = document.getElementById("selectedStopInfo");
-const stopCount = document.getElementById("stopCount");
-const routeCount = document.getElementById("routeCount");
-const mapMessage = document.getElementById("mapMessage");
+        return replacements[character];
+    });
+}
 
-const playbackStart = document.getElementById("playbackStart");
-const playbackEnd = document.getElementById("playbackEnd");
-const loadPlaybackButton = document.getElementById("loadPlaybackButton");
-const playbackTime = document.getElementById("playbackTime");
-const playbackSlider = document.getElementById("playbackSlider");
-const playbackStatus = document.getElementById("playbackStatus");
-const playButton = document.getElementById("playButton");
-const pauseButton = document.getElementById("pauseButton");
-const resetButton = document.getElementById("resetButton");
+function formatNumber(value) {
+    if (value === null || value === undefined || value === "") {
+        return "Unavailable";
+    }
 
-const vehicleLayer = L.layerGroup().addTo(map);
+    const number = Number(value);
 
-loadStops();
-loadRoutes();
+    return Number.isFinite(number)
+        ? number.toFixed(1)
+        : "Unavailable";
+}
 
-// Load stops from the backend
+function formatPercentage(value) {
+    const number = Number(value);
+
+    if (value === null || value === undefined || !Number.isFinite(number)) {
+        return "Unavailable";
+    }
+
+    return `${number.toFixed(1)}%`;
+}
+
+function showMapMessage(message) {
+    mapMessage.textContent = message;
+    mapMessage.classList.remove("hidden");
+}
+
+function hideMapMessage() {
+    mapMessage.classList.add("hidden");
+}
+
+function hasValidCoordinates(stop) {
+    if (
+        !stop ||
+        stop.stop_lat === null ||
+        stop.stop_lon === null ||
+        stop.stop_lat === "" ||
+        stop.stop_lon === ""
+    ) {
+        return false;
+    }
+
+    const latitude = Number(stop.stop_lat);
+    const longitude = Number(stop.stop_lon);
+
+    return (
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180
+    );
+}
+
+function performanceMarkup(performance) {
+    const metrics = [
+        ["Services analysed", performance.total_services],
+        ["Average delay", `${formatNumber(performance.average_delay)} min`],
+        ["On time", formatPercentage(performance.on_time_percentage)],
+        ["Delayed", formatPercentage(performance.delayed_percentage)],
+        ["Severe delay", formatPercentage(performance.severe_delay_percentage)],
+        ["Early", formatPercentage(performance.early_percentage)]
+    ];
+
+    return metrics.map(([label, value]) => `
+        <div class="performance-row">
+            <span class="performance-label">${escapeHtml(label)}</span>
+            <span class="performance-value">${escapeHtml(value)}</span>
+        </div>
+    `).join("");
+}
+
+// Load Adelaide Metro stops
 async function loadStops() {
     try {
         const response = await fetch(`${API_BASE_URL}/api/stops`);
@@ -74,21 +171,27 @@ async function loadStops() {
             throw new Error("Invalid stop data");
         }
 
-        stopData = stops
-            .filter(hasValidCoordinates)
-            .map(stop => ({
-                ...stop,
-                stop_lat: Number(stop.stop_lat),
-                stop_lon: Number(stop.stop_lon)
-            }));
+        stopData = stops.filter(hasValidCoordinates).map(stop => ({
+            ...stop,
+            stop_lat: Number(stop.stop_lat),
+            stop_lon: Number(stop.stop_lon)
+        }));
 
         createStopMarkers();
+
         stopCount.textContent = `${stopData.length} stops`;
 
-        if (stopData.length === 0) {
-            showMapMessage("No stop data is currently available.");
+        if (stopData.length > 0) {
+            const bounds = L.latLngBounds(
+                stopData.map(stop => [stop.stop_lat, stop.stop_lon])
+            );
+
+            map.fitBounds(bounds, {
+                padding: [30, 30],
+                maxZoom: 15
+            });
         } else {
-            fitMapToStops();
+            showMapMessage("No stop data is currently available.");
         }
 
         if (selectedLocation) {
@@ -97,6 +200,10 @@ async function loadStops() {
                 selectedLocation.longitude
             );
         }
+
+        if (hotspotData.length > 0) {
+            renderHotspots();
+        }
     } catch (error) {
         console.error("Stop loading error:", error);
         stopCount.textContent = "Stops unavailable";
@@ -104,7 +211,48 @@ async function loadStops() {
     }
 }
 
-// Load routes from the backend
+// Create clickable stop markers
+function createStopMarkers() {
+    for (const marker of stopMarkers.values()) {
+        map.removeLayer(marker);
+    }
+
+    stopMarkers.clear();
+
+    stopData.forEach(stop => {
+        const marker = L.circleMarker(
+            [stop.stop_lat, stop.stop_lon],
+            {
+                radius: 6,
+                color: "#3388ff",
+                fillColor: "#3388ff",
+                weight: 2,
+                fillOpacity: 0.8
+            }
+        ).addTo(map);
+
+        marker.bindTooltip(escapeHtml(stop.stop_name || "Stop"), {
+            direction: "top",
+            offset: [0, -5]
+        });
+
+        marker.bindPopup(`
+            <strong>${escapeHtml(stop.stop_name || "Stop")}</strong>
+            <br>Stop ID: ${escapeHtml(stop.stop_id)}
+            <br>Latitude: ${stop.stop_lat.toFixed(5)}
+            <br>Longitude: ${stop.stop_lon.toFixed(5)}
+        `);
+
+        marker.on("click", event => {
+            L.DomEvent.stopPropagation(event);
+            selectStop(stop);
+        });
+
+        stopMarkers.set(String(stop.stop_id), marker);
+    });
+}
+
+// Load routes into the dropdown
 async function loadRoutes() {
     routeSelect.disabled = true;
 
@@ -122,110 +270,73 @@ async function loadRoutes() {
         }
 
         routeData = routes;
-        populateRouteSelect();
+
+        routeSelect.innerHTML = '<option value="">Select a route</option>';
+
+        const sortedRoutes = [...routeData].sort((a, b) => {
+            const first = a.route_short_name || a.route_id;
+            const second = b.route_short_name || b.route_id;
+
+            return String(first).localeCompare(String(second), undefined, {
+                numeric: true
+            });
+        });
+
+        sortedRoutes.forEach(route => {
+            const option = document.createElement("option");
+
+            option.value = route.route_id;
+
+            const shortName = route.route_short_name || route.route_id;
+            const longName = route.route_long_name
+                ? ` — ${route.route_long_name}`
+                : "";
+
+            option.textContent = `${shortName}${longName}`;
+
+            routeSelect.appendChild(option);
+        });
 
         routeCount.textContent = `${routeData.length} routes`;
         routeSelect.disabled = false;
     } catch (error) {
         console.error("Route loading error:", error);
+
         routeCount.textContent = "Routes unavailable";
         routeSelect.innerHTML =
             '<option value="">Routes unavailable</option>';
     }
 }
 
-// Add stop markers to the map
-function createStopMarkers() {
-    stopData.forEach(stop => {
-        const marker = L.circleMarker(
-            [stop.stop_lat, stop.stop_lon],
-            {
-                radius: 6,
-                color: "#3388ff",
-                fillColor: "#3388ff",
-                weight: 2,
-                fillOpacity: 0.8
-            }
-        ).addTo(map);
-
-        stopMarkers[stop.stop_id] = marker;
-
-        marker.bindTooltip(escapeHtml(stop.stop_name), {
-            direction: "top",
-            offset: [0, -5]
-        });
-
-        marker.bindPopup(`
-            <strong>${escapeHtml(stop.stop_name)}</strong>
-            <br>Stop ID: ${escapeHtml(stop.stop_id)}
-            <br>Latitude: ${stop.stop_lat.toFixed(5)}
-            <br>Longitude: ${stop.stop_lon.toFixed(5)}
-        `);
-
-        marker.on("click", event => {
-            L.DomEvent.stopPropagation(event);
-            selectStop(stop);
-        });
-    });
-}
-
-// Fill the route dropdown
-function populateRouteSelect() {
-    routeSelect.innerHTML =
-        '<option value="">Select a route</option>';
-
-    const sortedRoutes = [...routeData].sort((a, b) => {
-        const nameA = a.route_short_name || a.route_id;
-        const nameB = b.route_short_name || b.route_id;
-
-        return String(nameA).localeCompare(
-            String(nameB),
-            undefined,
-            { numeric: true }
-        );
-    });
-
-    sortedRoutes.forEach(route => {
-        const option = document.createElement("option");
-
-        option.value = route.route_id;
-
-        const shortName = route.route_short_name || route.route_id;
-        const longName = route.route_long_name
-            ? ` — ${route.route_long_name}`
-            : "";
-
-        option.textContent = `${shortName}${longName}`;
-        routeSelect.appendChild(option);
-    });
-}
-
-// Update route details, geometry and playback together
+// Change the selected route
 function chooseRoute(routeId) {
     clearPlayback();
+    clearHotspots();
 
     if (!routeId) {
-        routePerformanceRequest++;
         routeMapRequest++;
-
-        routePerformance.classList.add("empty-card");
-        routePerformance.innerHTML =
-            "<p>Select a route to view performance.</p>";
+        routePerformanceRequest++;
 
         clearRouteLayers();
         hideMapMessage();
+
+        routePerformance.innerHTML =
+            "<p>Select a route to view performance.</p>";
+
+        routePerformance.classList.add("empty-card");
         return;
     }
 
     selectRoute(routeId);
     showRouteOnMap(routeId);
+    loadHotspots(routeId);
 }
 
 routeSelect.addEventListener("change", () => {
     chooseRoute(routeSelect.value);
 });
 
-// Remove the previous route layers
+// Clear previous route geometry
 function clearRouteLayers() {
     if (routeGeometryLayer) {
         map.removeLayer(routeGeometryLayer);
@@ -238,7 +349,7 @@ function clearRouteLayers() {
     }
 }
 
-// Show the selected route using official geometry
+// Show official recorded route geometry
 async function showRouteOnMap(routeId) {
     const requestId = ++routeMapRequest;
 
@@ -388,12 +499,13 @@ async function selectRoute(routeId) {
             displayRoutePerformance(route, performance);
         }
     } catch (error) {
-        console.error("Route performance error:", error);
-
-        if (requestId === routePerformanceRequest) {
-            routePerformance.innerHTML =
-                "<p>Unable to load route performance.</p>";
+        if (requestId !== routePerformanceRequest) {
+            return;
         }
+
+        console.error("Route performance error:", error);
+        routePerformance.innerHTML =
+            "<p>Unable to load route performance.</p>";
     }
 }
 
@@ -405,7 +517,7 @@ function displayRoutePerformance(route, performance) {
     if (!performance || performance.total_services === 0) {
         routePerformance.innerHTML = `
             <strong class="selected-stop-name">
-                ${escapeHtml(routeName)}
+                Route ${escapeHtml(routeName)}
             </strong>
             <p class="detail-message">
                 No performance data is currently available for this route.
@@ -422,20 +534,17 @@ function displayRoutePerformance(route, performance) {
     `;
 }
 
-// Load information when a stop is selected
+// Load routes and performance for a selected stop
 async function selectStop(stop) {
-    selectedStopId = stop.stop_id;
-    selectedStopInfo.classList.remove("empty-card");
+    selectedStopId = String(stop.stop_id);
 
+    selectedStopInfo.classList.remove("empty-card");
     selectedStopInfo.innerHTML = `
         <strong class="selected-stop-name">
             ${escapeHtml(stop.stop_name)}
         </strong>
         <div class="selected-stop-id">
             Stop ID: ${escapeHtml(stop.stop_id)}
-        </div>
-        <div class="selected-stop-location">
-            ${stop.stop_lat.toFixed(5)}, ${stop.stop_lon.toFixed(5)}
         </div>
         <p class="detail-message">Loading transport information...</p>
     `;
@@ -453,33 +562,27 @@ async function selectStop(stop) {
         }
 
         const routes = await routeResponse.json();
+
         let performance = null;
 
         if (performanceResponse.ok) {
             performance = await performanceResponse.json();
-        } else if (performanceResponse.status !== 404) {
-            throw new Error("Unable to load stop performance");
         }
 
-        if (selectedStopId !== stop.stop_id) {
+        if (selectedStopId !== String(stop.stop_id)) {
             return;
         }
 
         displayStopInformation(stop, routes, performance);
     } catch (error) {
-        console.error("Stop information error:", error);
-
-        if (selectedStopId !== stop.stop_id) {
+        if (selectedStopId !== String(stop.stop_id)) {
             return;
         }
 
+        console.error("Stop information error:", error);
+
         selectedStopInfo.innerHTML = `
-            <strong class="selected-stop-name">
-                ${escapeHtml(stop.stop_name)}
-            </strong>
-            <div class="selected-stop-id">
-                Stop ID: ${escapeHtml(stop.stop_id)}
-            </div>
+            <strong>${escapeHtml(stop.stop_name)}</strong>
             <p class="detail-message">
                 Unable to load transport information.
             </p>
@@ -487,40 +590,30 @@ async function selectStop(stop) {
     }
 }
 
-// Show routes and performance for the selected stop
+// Display stop details and clickable routes
 function displayStopInformation(stop, routes, performance) {
-    let routeMarkup = "";
+    const routeList = Array.isArray(routes) ? routes : [];
 
-    if (!Array.isArray(routes) || routes.length === 0) {
-        routeMarkup = `
-            <p class="detail-message">
-                No route information is available for this stop.
-            </p>
-        `;
-    } else {
-        routes.forEach(route => {
-            const shortName = route.route_short_name || route.route_id;
-            const longName =
-                route.route_long_name || "Route description unavailable";
-
-            routeMarkup += `
-                <div class="route-item"
-                     data-route-id="${escapeHtml(route.route_id)}">
-                    <span class="route-short-name">
-                        ${escapeHtml(shortName)}
-                    </span>
-                    <div class="route-long-name">
-                        ${escapeHtml(longName)}
-                    </div>
-                </div>
-            `;
-        });
-    }
+    const routeMarkup = routeList.length === 0
+        ? `<p class="detail-message">
+               No route information is available for this stop.
+           </p>`
+        : routeList.map(route => `
+            <div class="route-item"
+                 data-route-id="${escapeHtml(route.route_id)}">
+                <span class="route-short-name">
+                    ${escapeHtml(route.route_short_name || route.route_id)}
+                </span>
+                <span class="route-long-name">
+                    ${escapeHtml(route.route_long_name || "Route")}
+                </span>
+            </div>
+        `).join("");
 
     const performanceContent =
         !performance || performance.total_services === 0
             ? `<p class="detail-message">
-                   No performance data is currently available for this stop.
+                   No performance data is currently available.
                </p>`
             : performanceMarkup(performance);
 
@@ -547,49 +640,23 @@ function displayStopInformation(stop, routes, performance) {
 
     selectedStopInfo
         .querySelectorAll(".route-item[data-route-id]")
-        .forEach(element => {
-            element.style.cursor = "pointer";
+        .forEach(item => {
+            item.addEventListener("click", () => {
+                const routeId = item.dataset.routeId;
 
-            element.addEventListener("click", () => {
-                const routeId = element.dataset.routeId;
-
-                const routeExists = [...routeSelect.options].some(
+                const exists = [...routeSelect.options].some(
                     option => option.value === routeId
                 );
 
-                if (!routeExists) {
-                    return;
+                if (exists) {
+                    routeSelect.value = routeId;
+                    chooseRoute(routeId);
                 }
-
-                routeSelect.value = routeId;
-                chooseRoute(routeId);
             });
         });
 }
 
-function performanceMarkup(performance) {
-    const metrics = [
-        ["Services analysed", escapeHtml(performance.total_services)],
-        ["Average delay", `${formatNumber(performance.average_delay)} min`],
-        ["On time", formatPercentage(performance.on_time_percentage)],
-        ["Delayed", formatPercentage(performance.delayed_percentage)],
-        ["Severe delay", formatPercentage(performance.severe_delay_percentage)],
-        ["Early", formatPercentage(performance.early_percentage)]
-    ];
-
-    return `
-        <div class="performance-card">
-            ${metrics.map(([label, value]) => `
-                <div class="performance-row">
-                    <span class="performance-label">${label}</span>
-                    <span class="performance-value">${value}</span>
-                </div>
-            `).join("")}
-        </div>
-    `;
-}
-
-// Select a location by clicking the map
+// Select a location on the map
 map.on("click", event => {
     setSelectedLocation(
         event.latlng.lat,
@@ -598,13 +665,11 @@ map.on("click", event => {
     );
 });
 
-// Use the browser's location when permission is given
+// Use the browser's current location
 locationButton.addEventListener("click", () => {
     if (!navigator.geolocation) {
-        if (!selectedLocation) {
-            selectedLocationInfo.innerHTML =
-                "<p>Location services are not supported by this browser.</p>";
-        }
+        selectedLocationInfo.textContent =
+            "Location services are not supported by this browser.";
         return;
     }
 
@@ -628,14 +693,8 @@ locationButton.addEventListener("click", () => {
         error => {
             console.error("Geolocation error:", error);
 
-            if (!selectedLocation) {
-                selectedLocationInfo.innerHTML = `
-                    <p>
-                        Unable to access your location.
-                        You can still select a location by clicking the map.
-                    </p>
-                `;
-            }
+            selectedLocationInfo.textContent =
+                "Unable to access your location. Click the map instead.";
 
             resetLocationButton();
         },
@@ -646,7 +705,56 @@ locationButton.addEventListener("click", () => {
     );
 });
 
-// Update the selected location and its nearest stop
+function resetLocationButton() {
+    locationButton.disabled = false;
+    locationButton.textContent = "Use My Location";
+}
+
+// Calculate straight-line distance in metres
+function calculateStraightLineDistance(lat1, lon1, lat2, lon2) {
+    const radius = 6371000;
+    const radians = degrees => degrees * Math.PI / 180;
+
+    const latitudeDifference = radians(lat2 - lat1);
+    const longitudeDifference = radians(lon2 - lon1);
+
+    const a =
+        Math.sin(latitudeDifference / 2) ** 2 +
+        Math.cos(radians(lat1)) *
+        Math.cos(radians(lat2)) *
+        Math.sin(longitudeDifference / 2) ** 2;
+
+    return 2 * radius * Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+    );
+}
+
+// Find the closest stop
+function findNearestStop(latitude, longitude) {
+    let nearest = null;
+    let shortestDistance = Infinity;
+
+    for (const stop of stopData) {
+        const distance = calculateStraightLineDistance(
+            latitude,
+            longitude,
+            stop.stop_lat,
+            stop.stop_lon
+        );
+
+        if (distance < shortestDistance) {
+            nearest = stop;
+            shortestDistance = distance;
+        }
+    }
+
+    return nearest
+        ? { stop: nearest, distance: shortestDistance }
+        : null;
+}
+
+// Show the selected location
 function setSelectedLocation(latitude, longitude, source) {
     const lat = Number(latitude);
     const lon = Number(longitude);
@@ -665,14 +773,10 @@ function setSelectedLocation(latitude, longitude, source) {
         map.removeLayer(selectedLocationMarker);
     }
 
-    selectedLocationMarker = L.marker(
-        [lat, lon],
-        { title: "Selected Location" }
-    ).addTo(map);
+    selectedLocationMarker = L.marker([lat, lon]).addTo(map);
 
     selectedLocationMarker.bindPopup(`
-        <strong>Selected Location</strong>
-        <br>${escapeHtml(source)}
+        <strong>${escapeHtml(source)}</strong>
         <br>${lat.toFixed(5)}, ${lon.toFixed(5)}
     `);
 
@@ -697,54 +801,7 @@ function setSelectedLocation(latitude, longitude, source) {
     showNearestStop(lat, lon);
 }
 
-// Calculate straight-line distance between two locations
-function calculateStraightLineDistance(lat1, lon1, lat2, lon2) {
-    const earthRadiusMetres = 6371000;
-    const toRadians = degrees => degrees * Math.PI / 180;
-
-    const latitudeDifference = toRadians(lat2 - lat1);
-    const longitudeDifference = toRadians(lon2 - lon1);
-
-    const a =
-        Math.sin(latitudeDifference / 2) ** 2 +
-        Math.cos(toRadians(lat1)) *
-        Math.cos(toRadians(lat2)) *
-        Math.sin(longitudeDifference / 2) ** 2;
-
-    return 2 * earthRadiusMetres *
-        Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Find the closest stop in the loaded data
-function findNearestStop(latitude, longitude) {
-    let nearestStop = null;
-    let shortestDistance = Infinity;
-
-    for (const stop of stopData) {
-        const distance = calculateStraightLineDistance(
-            latitude,
-            longitude,
-            stop.stop_lat,
-            stop.stop_lon
-        );
-
-        if (distance < shortestDistance) {
-            nearestStop = stop;
-            shortestDistance = distance;
-        }
-    }
-
-    if (!nearestStop) {
-        return null;
-    }
-
-    return {
-        stop: nearestStop,
-        distance: shortestDistance
-    };
-}
-
-// Show and highlight the nearest stop
+// Highlight the nearest stop
 function showNearestStop(latitude, longitude) {
     if (nearestStopMarker) {
         nearestStopMarker.setStyle({
@@ -757,32 +814,26 @@ function showNearestStop(latitude, longitude) {
         nearestStopMarker = null;
     }
 
-    const resultElement = document.getElementById("nearestStopResult");
+    const resultElement = element("nearestStopResult");
 
     if (!resultElement) {
-        return;
-    }
-
-    if (stopData.length === 0) {
-        resultElement.innerHTML = `
-            <p class="detail-message">
-                No stop data is available to calculate the nearest stop.
-            </p>
-        `;
         return;
     }
 
     const result = findNearestStop(latitude, longitude);
 
     if (!result) {
-        resultElement.innerHTML =
-            "<p>Unable to find a nearby stop.</p>";
+        resultElement.innerHTML = `
+            <p class="detail-message">
+                No stop data is available to find the nearest stop.
+            </p>
+        `;
         return;
     }
 
     const { stop, distance } = result;
 
-    const distanceLabel = distance < 1000
+    const distanceText = distance < 1000
         ? `${Math.round(distance)} m`
         : `${(distance / 1000).toFixed(2)} km`;
 
@@ -805,16 +856,15 @@ function showNearestStop(latitude, longitude) {
 
         <div class="coordinate-row">
             <span class="coordinate-label">Straight-line distance</span>
-            <span class="coordinate-value">${distanceLabel}</span>
+            <span class="coordinate-value">${distanceText}</span>
         </div>
 
         <p class="detail-message">
-            Distance is measured in a straight line,
-            not along roads or walking paths.
+            This is straight-line distance, not walking distance.
         </p>
     `;
 
-    nearestStopMarker = stopMarkers[stop.stop_id] || null;
+    nearestStopMarker = stopMarkers.get(String(stop.stop_id)) || null;
 
     if (nearestStopMarker) {
         nearestStopMarker.setStyle({
@@ -828,131 +878,18 @@ function showNearestStop(latitude, longitude) {
     }
 }
 
-function resetLocationButton() {
-    locationButton.disabled = false;
-    locationButton.textContent = "Use My Location";
-}
-
-// Fit the map around the available stops
-function fitMapToStops() {
-    if (stopData.length === 0) {
-        return;
-    }
-
-    const bounds = L.latLngBounds(
-        stopData.map(stop => [stop.stop_lat, stop.stop_lon])
-    );
-
-    if (bounds.isValid()) {
-        map.fitBounds(bounds, {
-            padding: [30, 30],
-            maxZoom: 15
-        });
-    }
-}
-
-function showMapMessage(message) {
-    mapMessage.textContent = message;
-    mapMessage.classList.remove("hidden");
-}
-
-function hideMapMessage() {
-    mapMessage.classList.add("hidden");
-}
-
-function hasValidCoordinates(stop) {
-    if (!stop || typeof stop !== "object") {
-        return false;
-    }
-
-    if (
-        stop.stop_lat === null ||
-        stop.stop_lon === null ||
-        stop.stop_lat === "" ||
-        stop.stop_lon === ""
-    ) {
-        return false;
-    }
-
-    const lat = Number(stop.stop_lat);
-    const lon = Number(stop.stop_lon);
-
-    return (
-        Number.isFinite(lat) &&
-        Number.isFinite(lon) &&
-        lat >= -90 &&
-        lat <= 90 &&
-        lon >= -180 &&
-        lon <= 180
-    );
-}
-
-function formatNumber(value) {
-    if (value === null || value === undefined || value === "") {
-        return "Unavailable";
-    }
-
-    const number = Number(value);
-
-    return Number.isFinite(number)
-        ? number.toFixed(1)
-        : "Unavailable";
-}
-
-function formatPercentage(value) {
-    if (value === null || value === undefined || value === "") {
-        return "Unavailable";
-    }
-
-    const number = Number(value);
-
-    return Number.isFinite(number)
-        ? `${number.toFixed(1)}%`
-        : "Unavailable";
-}
-
-// Keep backend text safe when displaying it as HTML
-function escapeHtml(value) {
-    return String(value ?? "").replace(/[&<>"']/g, character => {
-        const replacements = {
-            "&": "&amp;",
-            "<": "&lt;",
-            ">": "&gt;",
-            '"': "&quot;",
-            "'": "&#039;"
-        };
-
-        return replacements[character];
-    });
-}
-
-// Convert Adelaide local time to an offset-aware timestamp
+// Convert the selected demo date to Adelaide time
 function getPlaybackDate(value) {
     if (!value) {
         return null;
     }
 
-    const match = value.match(
-        /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/
-    );
-
-    if (!match) {
-        return null;
-    }
-
-    const [, year, month, day, hour, minute] = match;
-
-    // Adelaide uses daylight saving from October to early April.
-    // September 2026 recorded data uses +09:30.
-    const offset = "+09:30";
-    const date = new Date(
-        `${year}-${month}-${day}T${hour}:${minute}:00${offset}`
-    );
+    const date = new Date(`${value}:00+09:30`);
 
     return Number.isNaN(date.getTime()) ? null : date;
 }
 
-// Format the playback clock in Adelaide time
+// Display Adelaide local time
 function formatPlaybackTime(date) {
     if (!date || Number.isNaN(date.getTime())) {
         return "--:--:--";
@@ -970,7 +907,7 @@ function formatPlaybackTime(date) {
     }).format(date);
 }
 
-// Remove old playback data when the route changes
+// Clear historical playback
 function clearPlayback() {
     playbackRequestId++;
     pausePlayback();
@@ -1000,7 +937,7 @@ function clearPlayback() {
         "Select a route and load its recorded vehicle history.";
 }
 
-// Load recorded positions from every API page
+// Load recorded GPS observations
 async function loadVehicleHistory() {
     const routeId = routeSelect.value;
 
@@ -1050,18 +987,9 @@ async function loadVehicleHistory() {
             }
 
             if (!response.ok) {
-                let message = `Unable to load vehicle history (${response.status}).`;
-
-                try {
-                    const errorData = await response.json();
-                    if (errorData.error) {
-                        message = errorData.error;
-                    }
-                } catch (_error) {
-                    // Keep the HTTP error message.
-                }
-
-                throw new Error(message);
+                throw new Error(
+                    `Unable to load vehicle history (${response.status}).`
+                );
             }
 
             const data = await response.json();
@@ -1096,38 +1024,25 @@ async function loadVehicleHistory() {
             offset = data.next_offset;
         }
 
-        if (
-            requestId !== playbackRequestId ||
-            routeSelect.value !== routeId
-        ) {
-            return;
-        }
+        recordedPositions = allPositions.filter(position => {
+            const latitude = Number(position.latitude);
+            const longitude = Number(position.longitude);
+            const timestamp = new Date(position.timestamp);
 
-        recordedPositions = allPositions
-            .filter(position => {
-                const latitude = Number(position.latitude);
-                const longitude = Number(position.longitude);
-                const time = new Date(position.timestamp);
-
-                return (
-                    position.latitude !== null &&
-                    position.longitude !== null &&
-                    Number.isFinite(latitude) &&
-                    Number.isFinite(longitude) &&
-                    latitude >= -90 &&
-                    latitude <= 90 &&
-                    longitude >= -180 &&
-                    longitude <= 180 &&
-                    !Number.isNaN(time.getTime())
-                );
-            })
-            .sort((a, b) => {
-                const difference =
-                    new Date(a.timestamp) - new Date(b.timestamp);
-
-                return difference ||
-                    Number(a.id || 0) - Number(b.id || 0);
-            });
+            return (
+                position.latitude != null &&
+                position.longitude != null &&
+                Number.isFinite(latitude) &&
+                Number.isFinite(longitude) &&
+                latitude >= -90 &&
+                latitude <= 90 &&
+                longitude >= -180 &&
+                longitude <= 180 &&
+                !Number.isNaN(timestamp.getTime())
+            );
+        }).sort((a, b) => {
+            return new Date(a.timestamp) - new Date(b.timestamp);
+        });
 
         playbackStartTime = start;
         playbackEndTime = end;
@@ -1167,24 +1082,19 @@ async function loadVehicleHistory() {
     }
 }
 
-// Show each vehicle at its last recorded position
+// Show the last recorded position for each vehicle
 function updateVehicleMarkers() {
     vehicleLayer.clearLayers();
 
-    if (!currentPlaybackTime || recordedPositions.length === 0) {
-        return {
-            vehicles: 0,
-            observations: 0
-        };
+    if (!currentPlaybackTime) {
+        return { vehicles: 0, observations: 0 };
     }
 
     const latestPositions = new Map();
     let observationCount = 0;
 
     for (const position of recordedPositions) {
-        const observationTime = new Date(position.timestamp);
-
-        if (observationTime > currentPlaybackTime) {
+        if (new Date(position.timestamp) > currentPlaybackTime) {
             break;
         }
 
@@ -1199,10 +1109,7 @@ function updateVehicleMarkers() {
 
     for (const position of latestPositions.values()) {
         const marker = L.circleMarker(
-            [
-                Number(position.latitude),
-                Number(position.longitude)
-            ],
+            [Number(position.latitude), Number(position.longitude)],
             {
                 radius: 8,
                 color: "#166534",
@@ -1217,11 +1124,9 @@ function updateVehicleMarkers() {
             <br>Vehicle: ${escapeHtml(position.vehicle_id || "Unknown")}
             <br>Route: ${escapeHtml(position.route_id || playbackRouteId)}
             <br>Trip: ${escapeHtml(position.trip_id || "Unknown")}
-            <br>GPS recorded: ${escapeHtml(
-                formatPlaybackTime(new Date(position.timestamp))
-            )}
-            <br>
-            <small>Last known position, not a live location.</small>
+            <br>GPS recorded:
+            ${escapeHtml(formatPlaybackTime(new Date(position.timestamp)))}
+            <br><small>Last recorded position, not live tracking.</small>
         `);
 
         marker.addTo(vehicleLayer);
@@ -1233,7 +1138,7 @@ function updateVehicleMarkers() {
     };
 }
 
-// Refresh the clock, slider and vehicle markers
+// Update the playback clock and map
 function updatePlaybackDisplay() {
     if (!currentPlaybackTime || !playbackStartTime) {
         return;
@@ -1249,17 +1154,12 @@ function updatePlaybackDisplay() {
 
     const result = updateVehicleMarkers();
 
-    if (result.observations === 0) {
-        playbackStatus.textContent =
-            "No observations recorded yet in this playback window.";
-    } else {
-        playbackStatus.textContent =
-            `${result.vehicles} vehicles shown from ` +
-            `${result.observations} recorded observations.`;
-    }
+    playbackStatus.textContent = result.observations === 0
+        ? "No observations recorded yet in this playback window."
+        : `${result.vehicles} vehicles shown from ` +
+          `${result.observations} recorded observations.`;
 }
 
-// Advance the playback clock by 30 seconds
 function advancePlayback() {
     if (!currentPlaybackTime || !playbackEndTime) {
         return;
@@ -1347,3 +1247,218 @@ playbackSlider.addEventListener("input", () => {
 
     updatePlaybackDisplay();
 });
+
+// Clear hotspots when changing routes
+function clearHotspots() {
+    hotspotRequest++;
+    hotspotData = [];
+
+    if (hotspotLayer) {
+        map.removeLayer(hotspotLayer);
+        hotspotLayer = null;
+    }
+
+    hotspotResults.innerHTML = "";
+    hotspotStatus.textContent = "Select a route to view hotspots.";
+}
+
+// Load ranked delay hotspots from the backend
+async function loadHotspots(routeId) {
+    const requestId = ++hotspotRequest;
+
+    hotspotData = [];
+
+    if (hotspotLayer) {
+        map.removeLayer(hotspotLayer);
+        hotspotLayer = null;
+    }
+
+    hotspotResults.innerHTML = "";
+    hotspotStatus.textContent = "Loading historical delay hotspots...";
+
+    try {
+        const params = new URLSearchParams({
+            route_id: routeId,
+            min_services: hotspotMinServices.value
+        });
+
+        const response = await fetch(
+            `${API_BASE_URL}/api/analysis/hotspots?${params}`
+        );
+
+        if (
+            requestId !== hotspotRequest ||
+            routeSelect.value !== routeId
+        ) {
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(
+                `Unable to load hotspots (${response.status}).`
+            );
+        }
+
+        const data = await response.json();
+
+        if (!Array.isArray(data.hotspots)) {
+            throw new Error("Invalid hotspot response.");
+        }
+
+        hotspotData = data.hotspots;
+        renderHotspots();
+    } catch (error) {
+        if (requestId !== hotspotRequest) {
+            return;
+        }
+
+        console.error("Hotspot loading error:", error);
+        hotspotStatus.textContent = error.message;
+    }
+}
+
+// Display hotspot markers and the ranked list
+function renderHotspots() {
+    if (hotspotLayer) {
+        map.removeLayer(hotspotLayer);
+        hotspotLayer = null;
+    }
+
+    hotspotResults.innerHTML = "";
+
+    if (hotspotData.length === 0) {
+        hotspotStatus.textContent =
+            "No stops meet the minimum service threshold for this route.";
+        return;
+    }
+
+    const stopLookup = new Map(
+        stopData.map(stop => [String(stop.stop_id), stop])
+    );
+
+    const markers = [];
+    let mappedCount = 0;
+
+    for (const hotspot of hotspotData) {
+        const stop = stopLookup.get(String(hotspot.stop_id));
+
+        if (!stop) {
+            continue;
+        }
+
+        mappedCount++;
+
+        const rank = Number(hotspot.rank) || mappedCount;
+        const severe = Number(hotspot.severe_delay_percentage);
+        const late = Number(hotspot.total_late_percentage);
+        const services = Number(hotspot.total_services);
+
+        const severeText = Number.isFinite(severe)
+            ? `${severe.toFixed(1)}%`
+            : "Unavailable";
+
+        const lateText = Number.isFinite(late)
+            ? `${late.toFixed(1)}%`
+            : "Unavailable";
+
+        const servicesText = Number.isFinite(services)
+            ? String(services)
+            : "Unavailable";
+
+        const marker = L.circleMarker(
+            [stop.stop_lat, stop.stop_lon],
+            {
+                radius: rank <= 3 ? 12 : 9,
+                color: "#991b1b",
+                fillColor: rank <= 3 ? "#dc2626" : "#f97316",
+                fillOpacity: 0.9,
+                weight: 2
+            }
+        );
+
+        marker.bindPopup(`
+            <strong>#${rank} Delay hotspot</strong>
+            <br>${escapeHtml(stop.stop_name)}
+            <br>Stop ID: ${escapeHtml(stop.stop_id)}
+            <br>Severe delays: ${severeText}
+            <br>Late services: ${lateText}
+            <br>Services analysed: ${servicesText}
+            <br>
+            <small>Historical analysis, not live delay information.</small>
+        `);
+
+        markers.push(marker);
+
+        if (mappedCount <= 10) {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "hotspot-item";
+
+            const title = document.createElement("strong");
+            title.textContent = `#${rank} ${stop.stop_name}`;
+
+            const details = document.createElement("small");
+            details.textContent =
+                `Severe delays: ${severeText} · ` +
+                `Late: ${lateText} · ${servicesText} services`;
+
+            button.append(title, details);
+
+            button.addEventListener("click", () => {
+                map.setView(
+                    [stop.stop_lat, stop.stop_lon],
+                    Math.max(map.getZoom(), 15)
+                );
+
+                if (hotspotToggle.checked && hotspotLayer) {
+                    marker.openPopup();
+                } else {
+                    selectStop(stop);
+                }
+            });
+
+            hotspotResults.appendChild(button);
+        }
+    }
+
+    if (mappedCount === 0) {
+        hotspotStatus.textContent =
+            `${hotspotData.length} hotspots returned, ` +
+            "but no matching stop coordinates were loaded.";
+        return;
+    }
+
+    hotspotLayer = L.layerGroup(markers);
+
+    if (hotspotToggle.checked) {
+        hotspotLayer.addTo(map);
+    }
+
+    hotspotStatus.textContent =
+        `${mappedCount} of ${hotspotData.length} ranked hotspots mapped. ` +
+        "Showing the top 10 below.";
+}
+
+// Show or hide the hotspot layer
+hotspotToggle.addEventListener("change", () => {
+    if (!hotspotLayer) {
+        return;
+    }
+
+    if (hotspotToggle.checked) {
+        hotspotLayer.addTo(map);
+    } else {
+        map.removeLayer(hotspotLayer);
+    }
+});
+
+// Refresh hotspots when the minimum service count changes
+hotspotMinServices.addEventListener("change", () => {
+    if (routeSelect.value) {
+        loadHotspots(routeSelect.value);
+    }
+});
+
+// Start loading the network
+loadStops();
+loadRoutes();

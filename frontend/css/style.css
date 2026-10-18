@@ -15,9 +15,9 @@ body {
 }
 
 .page-header {
-    background: #fff;
-    border-bottom: 1px solid #e4e7ec;
     padding: 20px 32px;
+    background: white;
+    border-bottom: 1px solid #e4e7ec;
 }
 
 .page-header h1 {
@@ -39,9 +39,9 @@ body {
 }
 
 .sidebar {
-    background: #fff;
-    border-right: 1px solid #e4e7ec;
     padding: 24px;
+    background: white;
+    border-right: 1px solid #e4e7ec;
     overflow-y: auto;
 }
 
@@ -81,8 +81,8 @@ body {
     flex-shrink: 0;
     width: 28px;
     height: 28px;
-    background: #e9efff;
     border-radius: 8px;
+    background: #e9efff;
     color: #2459a6;
     font-size: 13px;
     font-weight: 700;
@@ -105,10 +105,10 @@ body {
 }
 
 .info-card {
-    background: #f9fafb;
+    padding: 16px;
     border: 1px solid #eaecf0;
     border-radius: 10px;
-    padding: 16px;
+    background: #f9fafb;
     font-size: 13px;
     line-height: 1.6;
 }
@@ -124,7 +124,7 @@ body {
 #locationButton {
     width: 100%;
     padding: 12px;
-    border: 0;
+    border: none;
     border-radius: 8px;
     background: #1d2939;
     color: white;
@@ -205,13 +205,14 @@ body {
 
 .route-item {
     display: flex;
-    gap: 10px;
     align-items: center;
+    gap: 10px;
     margin: 7px 0;
     padding: 9px;
     border: 1px solid #eaecf0;
     border-radius: 7px;
     background: white;
+    cursor: pointer;
 }
 
 .route-item:hover {
@@ -221,8 +222,8 @@ body {
 .route-short-name {
     min-width: 42px;
     padding: 5px 7px;
-    background: #e9efff;
     border-radius: 5px;
+    background: #e9efff;
     color: #2459a6;
     font-weight: 700;
     text-align: center;
@@ -260,8 +261,8 @@ body {
 
 .map-status {
     display: flex;
-    gap: 8px;
     flex-wrap: wrap;
+    gap: 8px;
 }
 
 .status-pill {
@@ -275,9 +276,9 @@ body {
 }
 
 #map {
+    width: 100%;
     height: calc(100vh - 205px);
     min-height: 520px;
-    width: 100%;
     border: 1px solid #e4e7ec;
     border-radius: 12px;
     z-index: 0;
@@ -297,13 +298,15 @@ body {
     display: none;
 }
 
-.playback-card {
+.playback-card,
+.hotspot-card {
     display: flex;
     flex-direction: column;
     gap: 12px;
 }
 
-.playback-card label {
+.playback-card label,
+.hotspot-card > label:not(.hotspot-toggle) {
     color: #344054;
     font-size: 13px;
     font-weight: 600;
@@ -375,9 +378,73 @@ body {
     line-height: 1.5;
 }
 
-.playback-note {
+.playback-note,
+.hotspot-note {
     color: #667085;
     font-size: 12px;
+    line-height: 1.5;
+}
+
+.hotspot-toggle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #344054;
+    cursor: pointer;
+}
+
+.hotspot-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: #dc2626;
+}
+
+#hotspotMinServices {
+    padding: 10px;
+    font-size: 13px;
+}
+
+#hotspotStatus {
+    color: #475467;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+#hotspotResults {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hotspot-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    background: #fff;
+    color: #7f1d1d;
+    text-align: left;
+    cursor: pointer;
+}
+
+.hotspot-item:hover {
+    background: #fff1f2;
+    border-color: #f87171;
+}
+
+.hotspot-item strong {
+    font-size: 13px;
+}
+
+.hotspot-item small {
+    color: #667085;
+    font-size: 11px;
     line-height: 1.5;
 }
 
