@@ -120,3 +120,46 @@ Remaining checks are:
 
 CASR machine restart behaviour, long-running collection and the latest
 v2 database backup are outside this local verification.
+
+## Hotspot Frontend Verification — 18 October 2026
+
+Tester: Chenchen Zhang
+Tested commit: 72e1039dbc0382898e4ba467746d1aaada080d77
+
+This follow-up checked the hotspot frontend after F02 integration.
+It used the existing recorded demo database and map files.
+
+Result: the browser checks listed below passed, with the remaining
+interface limitations noted separately.
+
+| Check | Result | Observation |
+| --- | --- | --- |
+| G10 hotspot loading | Passed | With the minimum set to 10, the interface reported 145 of 145 ranked stops mapped and displayed the top 10. |
+| G10 displayed values | Passed for the sampled results | The first three entries showed severe-delay percentages of 17.9%, 17.6% and 16.0%, consistent with the reference results rounded to one decimal place. |
+| Route switching | Passed for G10 to M44 | The route map and hotspot list updated. M44 reported 114 of 114 ranked stops mapped. Its first entry showed 0.0% severe delay, 11.1% total late observations and 27 observations. |
+| Minimum observation filter | Passed | Changing G10 from 10 to 20 reduced the returned count from 145 to 141. |
+| Hotspot visibility toggle | Passed | Turning the checkbox off hid the hotspot markers. Turning it on restored them. The ranked list remained visible. |
+| List selection and popup | Passed for the first G10 entry | Clicking the first entry zoomed to stop 100640 and opened its hotspot popup. The popup showed rank 1, 17.9% severe delay, 17.9% total late observations and 28 observations. |
+
+Evidence:
+
+[G10 hotspot location and popup](evidence/sprint4/frontend-hotspot-popup-g10-20261018.png)
+
+### Remaining limitations
+
+- The hotspot controls and map require scrolling between different parts
+  of the page at the tested screen size.
+- The interface uses "services" for retained prediction observations.
+  These counts should not be presented as unique completed bus services.
+- Hotspot requests use the selected route and minimum observation count.
+  The playback time controls do not filter hotspot results.
+- The returned count includes stops that meet the minimum observation
+  threshold. It does not mean every returned stop had severe delays.
+
+This follow-up covers the listed browser interactions and sampled values.
+It does not independently validate the complete hotspot ranking or record
+a new full regression test run.
+
+The hotspot frontend is now integrated. References to pending hotspot
+integration earlier in this report describe the version tested on
+17 October and are superseded by this follow-up.
