@@ -1,5 +1,10 @@
 # Windows Historical Collector Deployment
 
+For an **existing v2 deployment**, follow the
+[v2 operations and safe-update handover](casr-v2-operations-and-handover.md).
+Keep its existing database and configuration; the new-database instruction
+below applies only when moving from the legacy schema, not a v2 software update.
+
 This guide prepares one CASR Windows computer to collect Adelaide Metro
 GTFS-Realtime history continuously. The collector stores Vehicle Positions and
 Trip Updates in a local SQLite database for later analysis.
@@ -112,6 +117,9 @@ From Command Prompt or PowerShell, run one bounded cycle:
 
 If successful, start continuous collection by omitting the cycle limit:
 
+Confirm a completed-cycle log and new ledger entry first. A bounded run can
+exit 0 even if a handled feed failure skipped its collection cycle.
+
 ```powershell
 .\scripts\start_historical_collector.bat
 ```
@@ -158,6 +166,10 @@ first optimised run.
 For a scheduled run, first disable its startup trigger. If maintenance is
 required, wait until the log shows the collector is waiting between cycles,
 then end the task. Re-enable and run the task after maintenance.
+
+Task Scheduler **End** is not a graceful `Ctrl+C` shutdown. Back up first,
+coordinate with the operator, confirm process exit and verify database
+integrity. See the handover for the current stop-control limitation.
 
 The Python entry point uses a Windows named mutex. A second collector launched
 in the same Windows session exits with code 2 instead of writing concurrently.
