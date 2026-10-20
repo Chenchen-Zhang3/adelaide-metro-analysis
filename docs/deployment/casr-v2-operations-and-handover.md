@@ -21,8 +21,8 @@ The merged C05 fix retains only the latest successful result during continuous
 collection; finite runs still return all successful results. The v2 schema,
 database write code and default polling/checkpoint settings are unchanged from
 the delivered v2 source. No database migration, reset or VACUUM is part of this
-update. A disposable old-code/new-code compatibility test is required before
-delivery; it does not validate the unknown current CASR database.
+update. Disposable old-code/new-code compatibility and snapshot recovery checks
+passed locally; they do not validate the unknown current CASR database.
 
 The separate `feature/windows-launcher-hotfix` commit
 `af4910e990c25de7b85a302d1e1f918532a560a7` is **not included**. Its interpreter
@@ -263,7 +263,7 @@ the agreed handover.
 | Current collector running now | AWAITING CASR EVIDENCE; earlier “I've got it working now” did not identify version/method or current health |
 | BAT launch at CASR | AWAITING CASR EVIDENCE |
 | Task Scheduler and reboot recovery | AWAITING CASR EVIDENCE |
-| Existing-v2 update compatibility | LOCAL VERIFIED only after candidate validation; actual CASR file still pending |
+| Existing-v2 update compatibility | LOCAL VERIFIED on an old-code-created disposable DB; actual CASR file still pending |
 | Genuine new v2 backup / production validation | AWAITING CASR EVIDENCE; no genuine backup identified in local project directories |
 | Sustained production growth | AWAITING CASR EVIDENCE |
 | C05 deployed at CASR | AWAITING CASR EVIDENCE; delivered old v2 predates the fix |

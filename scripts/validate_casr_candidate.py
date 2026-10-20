@@ -5,6 +5,7 @@ original v2 package's extracted root, never a production database.
 """
 
 import argparse
+from contextlib import closing
 import hashlib
 import json
 import os
@@ -57,13 +58,13 @@ def python(code, root, env):
 
 
 def snapshot(path):
-    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as db:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
         assert db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
         return {t: db.execute(f"SELECT * FROM {t} ORDER BY 1, 2").fetchall() for t in TABLES}
 
 
 def schema(path):
-    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as db:
+    with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
         return db.execute("SELECT type,name,sql FROM sqlite_master ORDER BY type,name").fetchall()
 
 
@@ -120,6 +121,12 @@ def validate(package, old_source):
         assert snapshot(database) == checkpoint
         assert snapshot(backup) == checkpoint
         checks.append("Online backup: all nine tables identical; restored snapshot accepts next cycle")
+        python(CYCLE_CODE.replace("MINUTE", "17"), old_source, environment(restored))
+        rollback = snapshot(restored)
+        assert [len(rollback[t]) for t in TABLES[:4]] == [5, 2, 1, 5]
+        assert rollback["trip_updates"] == resumed["trip_updates"]
+        assert rollback["collection_cycles"][:4] == resumed["collection_cycles"]
+        checks.append("Code rollback: original v2 continues on candidate-written disposable DB without reset")
         if os.name != "nt":
             raise RuntimeError("Windows BAT validation must run on Windows")
         launcher = candidate / "scripts/start_historical_collector.bat"
@@ -127,7 +134,7 @@ def validate(package, old_source):
         def bat(arguments, settings, expected):
             # A fixed, quoted known path; no shell-composed filesystem operations.
             result = subprocess.run(
-                ["cmd.exe", "/d", "/s", "/c", f'""{launcher}" {arguments}"'],
+                f'cmd.exe /d /s /c ""{launcher}" {arguments}"',
                 cwd=root, env=settings, capture_output=True, text=True, timeout=90)
             assert result.returncode == expected, result.stdout + result.stderr
             return result.stdout + result.stderr
