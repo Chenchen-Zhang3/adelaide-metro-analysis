@@ -1,8 +1,9 @@
 # CASR v2 collector operations and handover
 
-Prepared 20 October 2026. Proposed update: **CASR Windows Deployment v2.1
-CANDIDATE**, pending team review and a client maintenance window. This is not
-confirmation of installation, unattended startup or sustained operation at CASR.
+Updated 21 October 2026. Application update: **CASR Windows Deployment v2.1**.
+The ZIP manifest identifies a candidate or a final main-based build. Local
+validation and an agreed client maintenance window are required before delivery
+and installation. CASR startup and sustained operation still require evidence.
 
 The collector records Adelaide Metro Vehicle Positions and Trip Updates for
 historical analysis. Service Alerts are not persisted by this historical
@@ -13,9 +14,10 @@ collection contract. Missed realtime history cannot be recovered from the feed.
 The previously delivered v2 package was built from
 `7f2bbd6784439142ecdfc1b7b66819477f9fdedb`, ZIP SHA-256
 `907ACB86DB823991C6B6131A0E8F683F4A2027969C5B0373C2940EBFF1C250CF`.
-The candidate is based on main `8e7e85c4ec0386d599719a6a522158a7ff3d2359`
-plus the reviewed handover work. Read `candidate-manifest.json` in the actual
-ZIP for its exact source commit and per-file hashes.
+Read `release-manifest.json` in a final ZIP, or `candidate-manifest.json` in a
+candidate ZIP, for the exact source commit, build time and per-file hashes.
+Final builds must use the exact fetched `origin/main` commit. The build label
+does not establish that the package has passed validation or reached CASR.
 
 The merged C05 fix retains only the latest successful result during continuous
 collection; finite runs still return all successful results. The v2 schema,
@@ -28,7 +30,7 @@ The separate `feature/windows-launcher-hotfix` commit
 `af4910e990c25de7b85a302d1e1f918532a560a7` is **not included**. Its interpreter
 discovery and diagnostics may be useful, but the original CASR failure is not
 known. Keep that change separate: choosing a global interpreter could select
-different dependencies, and the candidate retains the documented explicit
+different dependencies, and v2.1 retains the documented explicit
 `.venv`/`ADELAIDE_METRO_PYTHON` contract.
 
 ## Runtime and configuration
@@ -61,6 +63,26 @@ environment value explicitly. Environment settings in a VS Code terminal are
 not automatically inherited by Task Scheduler. Configure them for the task's
 actual account/launch context and verify resolved paths in its output.
 
+Before an application update, set the confirmed existing file explicitly in
+the same PowerShell process that launches the BAT:
+
+```powershell
+# Replace the example with the actual existing CASR path confirmed by its operator.
+$database = 'C:\CASR\data\historical\adelaide_metro_history_v2.db'
+if (-not (Test-Path -LiteralPath $database -PathType Leaf)) { throw 'Existing database not found' }
+$env:ADELAIDE_METRO_DATABASE_PATH = (Resolve-Path -LiteralPath $database).Path
+```
+
+The BAT changes its working directory to its own application root. An unset
+database variable therefore selects that installation's `data\historical`
+file; a relative override is also interpreted from that application root.
+Moving the application without the absolute override can select a different
+file. The Python connection creates missing parent directories and SQLite
+creates a missing DB; startup does not check that an intended old file exists.
+The existence check above is mandatory for updates. Schedule the same absolute
+configuration for the actual task account; the interactive assignment alone
+does not configure Task Scheduler.
+
 Only official `stop_times.txt` is needed. It is loaded once per process.
 Record static archive/hash/feed version from the candidate manifest, compare
 with the client's current feed, and agree a refresh during maintenance.
@@ -68,6 +90,17 @@ Do not silently replace a newer client feed with an older packaged feed.
 Refresh from the official static source if it no longer covers deployment:
 <https://gtfs.adelaidemetro.com.au/v1/static/latest/google_transit.zip>.
 Keep the previous static file for rollback, separately from the live database.
+
+The v2.1 static baseline is official feed 1710 (2026-10-16 to 2027-04-09),
+804,594 stop-time rows. September recorded-demo feed 1692 is a separate artifact
+and must not be substituted. A static refresh rebuilds the in-memory index at
+restart; it does not rewrite old database history or clear persisted state.
+Trip Updates match `(trip_id, stop_id, stop_sequence)` exactly. Unmatched keys
+are skipped; changed schedule times can produce new state-change observations.
+Review realtime/static ID coverage before deployment. Feed validity dates alone
+do not prove that a live snapshot uses that feed version. Record capture times
+and matched/unmatched counts, investigate widespread mismatch, and withhold
+release approval until any compatibility concern is resolved.
 
 ## Startup, shutdown and scheduling
 

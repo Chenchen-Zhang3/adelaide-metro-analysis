@@ -201,6 +201,11 @@ The client or project team must perform these steps on the CASR computer:
 These instructions do not modify Task Scheduler automatically and do not
 assume administrator permissions.
 
+The startup trigger runs after Windows starts. It does not configure the
+computer's firmware/power settings to turn the physical machine on after an
+outage. CASR must confirm those arrangements and actual restart evidence;
+do not infer full power-loss recovery from Task Scheduler settings alone.
+
 ## 10. Create a safe database backup
 
 Do not copy the actively written `.db` file directly. Use SQLite's online
