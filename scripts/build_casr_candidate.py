@@ -1,4 +1,4 @@
-"""Build an allowlisted collector candidate from an explicit Git commit.
+"""Build an allowlisted collector candidate or final release from a Git commit.
 
 No working-tree files or historical databases are read into the package.
 The official static archive is supplied separately; provenance is recorded.
@@ -6,6 +6,7 @@ The official static archive is supplied separately; provenance is recorded.
 
 import argparse
 import csv
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -48,16 +49,30 @@ FILES = (
 STATIC_URL = "https://gtfs.adelaidemetro.com.au/v1/static/latest/google_transit.zip"
 
 
-def build(repo, commit, static_zip, output):
+def build(repo, commit, static_zip, output, release="candidate"):
+    if release not in {"candidate", "final"}:
+        raise ValueError("release must be candidate or final")
     repo, static_zip, output = map(Path, (repo, static_zip, output))
     if output.exists():
         raise FileExistsError(output)
     if output.resolve().is_relative_to(repo.resolve()):
-        raise ValueError("Candidate ZIP must be outside the repository")
+        raise ValueError("Deployment ZIP must be outside the repository")
     sha = subprocess.check_output(
         ["git", "rev-parse", "--verify", f"{commit}^{{commit}}"], cwd=repo,
         text=True,
     ).strip()
+    if release == "final":
+        main_sha = subprocess.check_output(
+            ["git", "rev-parse", "--verify", "origin/main^{commit}"],
+            cwd=repo, text=True,
+        ).strip()
+        if sha != main_sha:
+            raise ValueError("Final release must use the exact fetched origin/main commit")
+        reviewed_builder = subprocess.check_output(
+            ["git", "show", f"{sha}:scripts/build_casr_candidate.py"], cwd=repo,
+        )
+        if reviewed_builder.replace(b"\r\n", b"\n") != Path(__file__).read_bytes().replace(b"\r\n", b"\n"):
+            raise ValueError("Final build script must match the reviewed main source")
     contents = {
         name: subprocess.check_output(["git", "show", f"{sha}:{name}"], cwd=repo)
         for name in FILES
@@ -77,16 +92,20 @@ def build(repo, commit, static_zip, output):
         feed_info = archive.read("feed_info.txt").decode("utf-8-sig") if "feed_info.txt" in archive.namelist() else None
     contents["data/static_gtfs/stop_times.txt"] = stop_times
     manifest = {
-        "release": "CASR Windows Deployment v2.1 CANDIDATE",
+        "release": "CASR Windows Deployment v2.1" + (" CANDIDATE" if release == "candidate" else ""),
+        "release_kind": release,
+        "built_at_utc": datetime.now(timezone.utc).isoformat(),
         "source_commit": sha,
-        "approval": "Not an approved main release; review and client deployment pending",
+        "approval": ("Main-based release preparation; local validation required; client deployment pending"
+                     if release == "final" else "Not an approved main release; review and client deployment pending"),
         "static_source_url": STATIC_URL,
         "static_archive_sha256": hashlib.sha256(static_zip.read_bytes()).hexdigest(),
         "static_feed_info": feed_info,
         "stop_time_rows": rows,
         "files": {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()},
     }
-    contents["candidate-manifest.json"] = json.dumps(manifest, indent=2).encode()
+    manifest_name = "release-manifest.json" if release == "final" else "candidate-manifest.json"
+    contents[manifest_name] = json.dumps(manifest, indent=2).encode()
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, "x", compression=zipfile.ZIP_DEFLATED) as archive:
         for name, data in contents.items():
@@ -108,5 +127,7 @@ if __name__ == "__main__":
     parser.add_argument("--commit", required=True)
     parser.add_argument("--static-zip", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--release", choices=("candidate", "final"), default="candidate",
+                        help="Final requires the exact fetched origin/main commit; default: candidate")
     args = parser.parse_args()
-    build(args.repo, args.commit, args.static_zip, args.output)
+    build(args.repo, args.commit, args.static_zip, args.output, args.release)

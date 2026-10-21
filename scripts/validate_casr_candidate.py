@@ -79,8 +79,14 @@ def validate(package, old_source):
             names = archive.namelist()
             assert len(names) == len(set(names))
             assert all(not Path(n).is_absolute() and ".." not in Path(n).parts for n in names)
-            manifest = json.loads(archive.read("candidate-manifest.json"))
-            assert set(names) == set(manifest["files"]) | {"candidate-manifest.json"}
+            manifests = set(names) & {"candidate-manifest.json", "release-manifest.json"}
+            assert len(manifests) == 1, "Exactly one deployment manifest is required"
+            manifest_name = manifests.pop()
+            manifest = json.loads(archive.read(manifest_name))
+            if manifest_name == "release-manifest.json":
+                assert manifest["release_kind"] == "final"
+                assert manifest["release"] == "CASR Windows Deployment v2.1"
+            assert set(names) == set(manifest["files"]) | {manifest_name}
             for name, digest in manifest["files"].items():
                 assert hashlib.sha256(archive.read(name)).hexdigest() == digest, name
                 assert not name.endswith((".db", ".sqlite", ".log", ".pyc"))
@@ -127,6 +133,31 @@ def validate(package, old_source):
         assert rollback["trip_updates"] == resumed["trip_updates"]
         assert rollback["collection_cycles"][:4] == resumed["collection_cycles"]
         checks.append("Code rollback: original v2 continues on candidate-written disposable DB without reset")
+        # A missing path creates a database; an update must precheck existence.
+        probe_code = '''
+from backend.database.connection import DATABASE_PATH, get_connection
+from contextlib import closing
+with closing(get_connection()) as db:
+    db.execute("CREATE TABLE IF NOT EXISTS path_probe (value TEXT)")
+    db.execute("INSERT INTO path_probe VALUES ('retained')")
+    db.commit()
+print(DATABASE_PATH.resolve())
+'''
+        cwd_a, cwd_b = root / "cwd-a", root / "cwd-b"
+        cwd_a.mkdir()
+        cwd_b.mkdir()
+        absolute = root / "existing-location" / "absolute.db"
+        path_env = environment(absolute)
+        path_env["PYTHONPATH"] = str(candidate)
+        python(probe_code, cwd_a, path_env)
+        python(probe_code, cwd_b, path_env)
+        with closing(sqlite3.connect(absolute)) as db:
+            assert db.execute("SELECT COUNT(*) FROM path_probe").fetchone()[0] == 2
+        path_env["ADELAIDE_METRO_DATABASE_PATH"] = "relative.db"
+        python(probe_code, cwd_a, path_env)
+        python(probe_code, cwd_b, path_env)
+        assert (cwd_a / "relative.db").is_file() and (cwd_b / "relative.db").is_file()
+        checks.append("DB paths: missing file creates DB; absolute path survives cwd changes; relative paths select different files")
         if os.name != "nt":
             raise RuntimeError("Windows BAT validation must run on Windows")
         launcher = candidate / "scripts/start_historical_collector.bat"
@@ -148,6 +179,9 @@ def validate(package, old_source):
         smoke = environment(root / "smoke.db")
         smoke["ADELAIDE_METRO_PYTHON"] = sys.executable
         assert "max cycles must be greater than zero" in bat("--max-cycles 0", smoke, 2)
+        defaults = dict(smoke)
+        defaults.pop("ADELAIDE_METRO_DATABASE_PATH")
+        assert str(candidate / "data/historical/adelaide_metro_history_v2.db") in bat("--max-cycles 0", defaults, 2)
         checks.append("BAT from unrelated working directory: missing Python/static and invalid cycles diagnostics")
         # Test-only startup hook outside package; all networking forbidden.
         # Real CLI, static parsing, mutex, loop, persistence and logs remain active.

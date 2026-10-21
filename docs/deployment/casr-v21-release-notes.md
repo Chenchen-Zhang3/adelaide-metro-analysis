@@ -1,8 +1,10 @@
-# CASR Windows Deployment v2.1 — candidate release notes
+# CASR Windows Deployment v2.1 — release notes
 
-20 October 2026. Review candidate, not yet approved or delivered to CASR.
-Exact source commit and official static feed provenance are in the ZIP's
-`candidate-manifest.json`.
+Updated 21 October 2026. A final build uses reviewed main and records its exact
+source commit, build time, file hashes and official static feed provenance in
+`release-manifest.json`. Candidate builds use `candidate-manifest.json` and
+remain subject to review. Build status does not establish client deployment;
+delivery requires completed local checks and an agreed handover.
 
 ## Changes
 
@@ -42,7 +44,7 @@ No new stop-control channel or cross-session mutex guarantee is introduced.
 
 Hi Jamie and Martin,
 
-We have prepared a v2.1 collector update candidate containing the continuous
+We have prepared a v2.1 collector update containing the continuous
 collection memory-retention fix and updated operating/backup guidance. The v2
 database format is unchanged; the update is intended to preserve your existing
 database and settings. Please do not replace or delete the current database.
