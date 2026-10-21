@@ -1,5 +1,13 @@
 # CASR v2.1 final release readiness — 21 October 2026
 
+Update after PR #67: metadata/provenance correction is merged in main
+`49c0705cebf3da4f75fc77e77b139b863ed8b110`; that blocker is resolved. The
+remaining static/realtime issue is investigated in
+[the compatibility report](casr-v21-static-realtime-compatibility.md).
+New replay: 58/1,693 supported arrival observations have conflicting sequence
+values after static numbering gaps. Release remains HOLD; see that report for
+the current gates. The sections below retain the earlier preparation record.
+
 **HOLD — NOT READY TO SEND.** No final approved release ZIP was produced.
 The reviewed main runtime passes local checks, but release metadata needs a
 reviewed correction and a static/realtime sequence mismatch remains unresolved.
