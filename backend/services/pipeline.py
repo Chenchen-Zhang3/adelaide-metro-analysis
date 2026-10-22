@@ -175,17 +175,42 @@ def run_collection_and_persist(
     return results
 
 
+
 def prepare_analysis_records(records):
     """Prepare database records for delay analysis."""
 
-    # Store analysis-ready records.
-    analysis_records = []
+    from backend.analysis.punctuality import classify_punctuality
 
-    for record in records:
-        # Read the record timestamp.
+    latest_records = {}
+
+    for index, record in enumerate(records):
+        if (
+            record.get("trip_id") is not None
+            and record.get("scheduled_arrival") is not None
+        ):
+            key = (
+                record["trip_id"],
+                record["stop_id"],
+                record["scheduled_arrival"],
+            )
+        else:
+            # Keep legacy records separately when identity is unavailable.
+            key = ("legacy_record", index)
+
         timestamp = record.get("timestamp")
 
-        # Determine the time period.
+        if key not in latest_records:
+            latest_records[key] = record
+        else:
+            previous = latest_records[key]
+            if (timestamp or "") >= (previous.get("timestamp") or ""):
+                latest_records[key] = record
+
+    analysis_records = []
+
+    for record in latest_records.values():
+        timestamp = record.get("timestamp")
+
         if timestamp:
             hour = datetime.fromisoformat(timestamp).hour
 
@@ -198,15 +223,17 @@ def prepare_analysis_records(records):
         else:
             time_period = "Unknown"
 
-        # Add the analysis record.
+        delay_minutes = record["delay_seconds"] / 60
+
         analysis_records.append({
             "route_id": record["route_id"],
             "stop_id": record["stop_id"],
-            "delay_minutes": record["delay_seconds"] / 60,
+            "delay_minutes": delay_minutes,
+            "punctuality_status": classify_punctuality(delay_minutes),
             "time_period": time_period,
+            "data_type": "realtime_prediction",
         })
 
-    # Return analysis-ready records.
     return analysis_records
 
 

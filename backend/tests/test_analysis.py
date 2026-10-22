@@ -149,3 +149,118 @@ def test_validate_analysis_with_sample_data():
     # Validate delay hotspot output
     assert "delay_hotspots" in result
     assert len(result["delay_hotspots"]) == 2
+
+
+from backend.services.pipeline import prepare_analysis_records
+
+
+def test_latest_prediction_deduplication():
+    records = [
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 120,
+            "timestamp": "2026-10-22T09:50:00+10:30",
+        },
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 480,
+            "timestamp": "2026-10-22T09:55:00+10:30",
+        },
+    ]
+
+    result = prepare_analysis_records(records)
+
+    assert len(result) == 1
+    assert result[0]["delay_minutes"] == 8
+    assert result[0]["punctuality_status"] == "Delayed"
+    assert result[0]["data_type"] == "realtime_prediction"
+
+
+def test_multiple_scheduled_arrivals():
+    records = [
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 300,
+            "timestamp": "2026-10-22T09:50:00+10:30",
+        },
+        {
+            "trip_id": "T2",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:15:00+10:30",
+            "delay_seconds": 720,
+            "timestamp": "2026-10-22T10:05:00+10:30",
+        },
+    ]
+
+    result = prepare_analysis_records(records)
+
+    assert len(result) == 2
+    assert result[0]["punctuality_status"] == "On Time"
+    assert result[1]["punctuality_status"] == "Severely Delayed"
+
+from backend.services.pipeline import prepare_analysis_records
+
+
+def test_latest_prediction_deduplication():
+    records = [
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 120,
+            "timestamp": "2026-10-22T09:50:00+10:30",
+        },
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 480,
+            "timestamp": "2026-10-22T09:55:00+10:30",
+        },
+    ]
+
+    result = prepare_analysis_records(records)
+
+    assert len(result) == 1
+    assert result[0]["delay_minutes"] == 8
+    assert result[0]["punctuality_status"] == "Delayed"
+    assert result[0]["data_type"] == "realtime_prediction"
+
+
+def test_multiple_scheduled_arrivals():
+    records = [
+        {
+            "trip_id": "T1",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:00:00+10:30",
+            "delay_seconds": 300,
+            "timestamp": "2026-10-22T09:50:00+10:30",
+        },
+        {
+            "trip_id": "T2",
+            "route_id": "R1",
+            "stop_id": "S1",
+            "scheduled_arrival": "2026-10-22T10:15:00+10:30",
+            "delay_seconds": 720,
+            "timestamp": "2026-10-22T10:05:00+10:30",
+        },
+    ]
+
+    result = prepare_analysis_records(records)
+
+    assert len(result) == 2
+    assert result[0]["punctuality_status"] == "On Time"
+    assert result[1]["punctuality_status"] == "Severely Delayed"
