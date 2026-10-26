@@ -232,3 +232,9 @@ __marimo__/
 
 data/static_gtfs/
 logs/
+
+# Sprint 5 local research data
+data/historical/
+data/exports/
+data/backups/
+data/recovery/
