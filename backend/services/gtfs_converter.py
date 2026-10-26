@@ -89,6 +89,7 @@ def gtfs_time_to_datetime(service_date, gtfs_time):
 
 
 def build_stop_time_index(stop_times):
+    """Index exact static visits, rejecting duplicate normalised identities."""
     index = {}
 
     for stop_time in stop_times:
@@ -97,6 +98,9 @@ def build_stop_time_index(stop_times):
             str(stop_time["stop_id"]),
             int(stop_time["stop_sequence"]),
         )
+
+        if key in index:
+            raise ValueError(f"Duplicate static stop-time key: {key!r}")
 
         index[key] = stop_time
 
