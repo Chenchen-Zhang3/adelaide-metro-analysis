@@ -2,6 +2,15 @@
 
 ## Overview
 
+**Scope clarification, 27 October 2026:** the four-cycle figures below belong
+to the database component's reported verification dataset. This document does
+not identify a source hash that links them to the October CASR production v2
+backup, which separately failed integrity validation. These figures must not
+be used as that backup's coverage or as Adelaide-wide production evidence.
+Production integrity, coverage and sustained reliability remain unverified;
+**v2.1 remains HOLD**. For current operation and research interpretation, use the
+[CASR technical guide](../handover/casr-gtfs-data-collection-and-access.md).
+
 This document provides the final Sprint 5 handover for the historical database
 component of the Adelaide Metro Real-Time Transport Analysis project.
 
@@ -59,7 +68,7 @@ Trip Updates stored: 3387
 Unchanged updates suppressed: 2377
 ```
 
-This confirms that the historical storage optimisation was working as expected.
+This reports storage optimisation behavior for that verification dataset.
 
 ## Research Query and Export Access
 
@@ -120,6 +129,13 @@ Static GTFS is used for scheduled frequency because realtime observations do
 not represent scheduled service frequency.
 
 Historical GTFS-Realtime data is used for delay and reliability analysis.
+
+These are prediction-based metrics. The reliability script aggregates retained
+observations rather than completed trips. Its current calendar handling can
+select all route trips when the active-service set is empty; validate no-service
+dates and cross-day cases before relying on scheduled frequencies. The
+[research-access guide](../handover/casr-gtfs-data-collection-and-access.md#7-accessing-historical-data)
+documents this source limitation and the tools' connection/time-filter behavior.
 
 The analysis utility is:
 
@@ -224,4 +240,6 @@ The Sprint 5 historical database has been verified for:
 - recovery
 - final handover
 
-The historical database is ready for final project handover and research use.
+These results support handover of the database component for the reported
+verification dataset. Use only separately integrity-verified snapshots for
+research; they do not establish final CASR production readiness or release approval.

@@ -1,5 +1,10 @@
 # Windows Historical Collector Deployment
 
+For the end-to-end workflow and verified researcher examples, see the
+[CASR technical guide](../handover/casr-gtfs-data-collection-and-access.md).
+These are deployment instructions, not confirmed CASR Task Scheduler settings.
+The October production backup failed integrity validation; v2.1 remains HOLD.
+
 For an **existing v2 deployment**, follow the
 [v2 operations and safe-update handover](casr-v2-operations-and-handover.md).
 Keep its existing database and configuration; the new-database instruction
@@ -139,11 +144,12 @@ The log rotates at 5 MB and retains five older files. It records startup,
 static-index loading, collection summaries, feed failures, persistence
 failures, waits and shutdown.
 
-To confirm data is accumulating:
-
-```powershell
-.\.venv\Scripts\python.exe -c "import sqlite3; db=sqlite3.connect(r'data\historical\adelaide_metro_history_v2.db'); print('vehicles:', db.execute('SELECT COUNT(*) FROM vehicle_positions').fetchone()[0]); print('trip updates:', db.execute('SELECT COUNT(*) FROM trip_updates').fetchone()[0]); db.close()"
-```
+Confirm completed-cycle logs and use the
+[read-only snapshot and ledger examples](../handover/casr-gtfs-data-collection-and-access.md#7-accessing-historical-data)
+to inspect accumulating data after online backup and integrity verification.
+Verify the resolved configured path first; an ordinary SQLite connection to a
+mistyped path can silently create an empty database. Ledger timestamps can be
+feed observation times, so use logs and freshness alongside counts.
 
 Vehicle counts normally increase after successful cycles. Trip Update history
 stores state changes immediately and unchanged-state checkpoints every 15
@@ -158,10 +164,14 @@ returns exit code 0. Starting the same batch file again reuses the persisted
 `trip_update_current_state` table, so unchanged predictions are not duplicated
 after restart.
 
-The optimised collector must start with a new database. It deliberately refuses
+When transitioning from the legacy schema, the optimised collector must start
+with a new database. It deliberately refuses
 to modify a legacy database containing the old TEXT/`actual_arrival` schema.
 Keep the old database as a read-only archive and configure a new path before the
 first optimised run.
+
+An existing v2 installation keeps its v2 database during a software update;
+preserve its absolute configured path and obtain a verified backup first.
 
 For a scheduled run, first disable its startup trigger. If maintenance is
 required, wait until the log shows the collector is waiting between cycles,

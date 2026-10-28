@@ -1,5 +1,13 @@
 # CASR v2 collector operations and handover
 
+**Status clarification, 27 October 2026:** the October CASR production v2 backup
+failed `PRAGMA integrity_check` with `database disk image is malformed`.
+Preserve it; stop analysis and request a separately verified source-side backup.
+Production coverage/reliability remain unverified and **v2.1 remains HOLD**.
+The procedures below are operating instructions, not release approval. The
+[CASR technical guide](../handover/casr-gtfs-data-collection-and-access.md) is the
+current entry point for processing and researcher access.
+
 Updated 21 October 2026. Application update: **CASR Windows Deployment v2.1**.
 The ZIP manifest identifies a candidate or a final main-based build. Local
 validation and an agreed client maintenance window are required before delivery
@@ -237,11 +245,13 @@ A filename alone does not establish that it is production data.
 1. Hash and preserve the received original. Copy the closed snapshot to a
    separate validation location; open with SQLite URI `mode=ro`. Do not call
    application `create_tables`, migrate, VACUUM or start collection on it.
-2. Run the following read-only SQL (SQLite CLI or a read-only Python connection).
-   Save the results with the snapshot hash and validation time:
+2. Run `PRAGMA integrity_check` alone through a read-only connection. If it
+   raises an exception or returns anything other than `ok`, stop here, preserve
+   the input and request source-side verification. Do not run coverage scans
+   against a failed file. Only after integrity passes, run the following SQL
+   and save results with the snapshot hash and validation time:
 
 ```sql
-PRAGMA integrity_check;
 SELECT * FROM schema_metadata;
 SELECT name, sql FROM sqlite_master WHERE type IN ('table','index') ORDER BY name;
 SELECT COUNT(*), MIN(timestamp), MAX(timestamp) FROM vehicle_positions;
@@ -297,7 +307,7 @@ the agreed handover.
 | BAT launch at CASR | AWAITING CASR EVIDENCE |
 | Task Scheduler and reboot recovery | AWAITING CASR EVIDENCE |
 | Existing-v2 update compatibility | LOCAL VERIFIED on an old-code-created disposable DB; actual CASR file still pending |
-| Genuine new v2 backup / production validation | AWAITING CASR EVIDENCE; no genuine backup identified in local project directories |
+| New v2 backup / production validation | BLOCKED: October backup failed integrity; source-side verification and a separately verified replacement are required |
 | Sustained production growth | AWAITING CASR EVIDENCE |
 | C05 deployed at CASR | AWAITING CASR EVIDENCE; delivered old v2 predates the fix |
 | Candidate delivery and CASR startup | AWAITING CASR EVIDENCE; not sent by this task |
