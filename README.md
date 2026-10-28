@@ -4,7 +4,20 @@ This repository contains the prototype developed for the Adelaide Metro Real-Tim
 
 The project is being developed for CASR researchers to support the collection, storage, exploration and analysis of Adelaide Metro GTFS and GTFS-Realtime data.
 
-## Current Prototype Status — Sprint 4
+## CASR technical guide — Sprint 5
+
+Start with the [CASR GTFS collection and data-access guide](docs/handover/casr-gtfs-data-collection-and-access.md)
+for the processing architecture, collection lifecycle, v2 schema, verified
+research examples, API boundaries and Windows operation/recovery references.
+The [Sprint 5 integration report](docs/integration/sprint5-gtfs-integration.md)
+records static coverage and the SCRUM-268 duplicate-key fix merged through PR #69.
+
+The October CASR production v2 backup failed integrity validation. Production
+coverage and sustained reliability remain unverified pending a separately
+verified replacement. **v2.1 remains HOLD.** Local tests and the database team's
+separate verification do not remove that release restriction.
+
+## Current Prototype Status
 
 The prototype collects and stores Adelaide Metro GTFS-Realtime data
 and provides a browser interface for exploring recorded transport data.
@@ -225,12 +238,12 @@ Leaflet and basemap tiles require internet access or cached resources.
 - The demo uses a fixed recorded dataset rather than a live browser feed.
 - The delay-hotspot endpoint is available, but the hotspot frontend is not yet integrated.
 - Nearest-stop distance is straight-line distance, not road-network distance.
-- Performance counts represent retained prediction observations, not unique completed services.
+- Backend performance counts use the latest prediction per trip/stop/scheduled-arrival key in the query result, not unique completed services; the separate reliability CLI aggregates retained rows.
 - Some interface labels and the map/control layout still need improvement.
 - Leaflet and basemap tiles depend on online or cached resources.
 - Browser geolocation depends on browser permissions and operating system settings.
 - Automatic collector restart after a power interruption on the CASR computer has not been confirmed.
-- The latest CASR database backup and long-term storage growth still need follow-up.
+- The October CASR v2 backup failed integrity validation; production coverage and long-term storage growth need a verified replacement and supporting logs.
 - Service Alerts do not yet have a historical persistence contract.
 - Production monitoring and alerting are not yet configured.
 
@@ -264,7 +277,7 @@ Trip Updates use the storage-optimised schema: state changes are stored
 immediately, unchanged predictions receive periodic checkpoints, timestamps are
 stored internally as epoch integers, and `actual_arrival` is reconstructed from
 the schedule plus delay. See
-`docs/architecture/historical-storage-optimisation.md` for benchmarks and safe
+[Historical storage optimisation](docs/architecture/historical-storage-optimisation.md) for controlled replay benchmarks and safe
 deployment guidance.
 
 ### Requirements

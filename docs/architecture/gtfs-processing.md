@@ -1,5 +1,11 @@
 # GTFS Processing Approach
 
+For the current end-to-end workflow, v2 physical schema, researcher examples
+and operating limitations, start with the
+[CASR technical guide](../handover/casr-gtfs-data-collection-and-access.md).
+This module reference distinguishes processing from persistence; historical
+Sprint 2 test counts below are not current release evidence.
+
 ## Overview
 
 The backend processes both Adelaide Metro static GTFS data and GTFS-Realtime feeds.
@@ -12,7 +18,7 @@ Static GTFS files
 
 GTFS-Realtime API
 → Collection configuration and scheduled collector
-→ Retry-aware realtime client
+→ HTTP client (retries coordinated by the collector)
 → Protobuf decoder and record validation
 → GTFS conversion and timestamp/delay processing
 → Database-ready historical records
@@ -141,7 +147,7 @@ be converted.
 plain-dictionary contract accepted by the database repository. Vehicle Position
 records contain `vehicle_id`, optional `trip_id` and `route_id`, `latitude`,
 `longitude`, and an optional ISO 8601 `timestamp`. Trip Update records contain
-`trip_id`, `route_id`, `stop_id`, optional arrival timestamps, integer
+`trip_id`, `route_id`, `stop_id`, required `scheduled_arrival`, optional `actual_arrival`, integer
 `delay_seconds`, and an optional ISO 8601 `timestamp`.
 
 The adapter normalises missing optional values to `None`, preserves identifier
@@ -166,14 +172,20 @@ its output directly to `insert_vehicle_position()` or `insert_trip_update()`.
 | `trip_id` | `str` | Yes | GTFS trip identifier |
 | `route_id` | `str` | Yes | GTFS route identifier |
 | `stop_id` | `str` | Yes | Matched GTFS stop identifier |
-| `scheduled_arrival` | ISO 8601 `str` or `None` | No | Scheduled Adelaide arrival time |
-| `actual_arrival` | ISO 8601 `str` or `None` | No | Realtime arrival used for delay calculation |
-| `delay_seconds` | `int` | Yes | Raw actual-minus-scheduled delay |
+| `scheduled_arrival` | ISO 8601 `str` | Yes | Scheduled Adelaide arrival time |
+| `actual_arrival` | ISO 8601 `str` or `None` | No | Legacy field name for the supplied realtime arrival estimate |
+| `delay_seconds` | `int` | Yes | Signed supplied-arrival-minus-scheduled delay |
 | `timestamp` | ISO 8601 `str` or `None` | No | Trip Update message timestamp in Adelaide time |
 
 The repository functions in `backend/database/repository.py` accept these
 dictionaries directly. Optional values are read with `.get(...)`, preserving
 the `None` convention as SQL `NULL`.
+
+This is the application contract, not the physical v2 schema. Trip Update
+`scheduled_arrival` and `observed_at` are stored as integer UTC epoch seconds;
+the application `timestamp` maps to `observed_at`. `actual_arrival` is derived
+from schedule plus delay rather than stored. Vehicle Position timestamps remain
+TEXT. See [the v2 query reference](../database_query_interface.md).
 
 ### Integrated processing workflow
 
@@ -210,6 +222,13 @@ service also exposes `persist_collection_result(collection_result)` to insert
 both record lists and return processed counts. Database querying, analysis, API
 and frontend integration remain outside this realtime subsystem.
 
+For continuous historical collection, use `HistoricalCollectionRunner`, which
+passes the collector to `run_collection_and_persist()`. That scheduler handles
+request, processing and SQLite failures per cycle and retains only the latest
+successful result in continuous mode. The processing-only `run()` described
+above catches retry exhaustion only, accumulates successful results, and never
+persists them. These loops have different operating contracts.
+
 ---
 
 ## Shared Data Conversion
@@ -237,7 +256,9 @@ Realtime timestamps are converted to ISO 8601 format using the Adelaide timezone
 
 ## Delay Calculation
 
-Adelaide Metro realtime trip updates provide actual arrival timestamps.
+The converter uses GTFS-Realtime `stop_time_update.arrival.time`, which may be
+an arrival prediction. It does not independently confirm actual arrival events.
+The internal name `actual_arrival` must not be interpreted as that confirmation.
 
 Static `stop_times.txt` provides the scheduled arrival time.
 
@@ -251,6 +272,10 @@ The backend matches records using:
 match. Its key is `(trip_id, stop_id, stop_sequence)`. Build the index once and
 inject it into `GTFSRealtimeProcessingPipeline` or `GTFSRealtimeCollector` so
 that it can be reused across cycles rather than rebuilt for every entity.
+
+SCRUM-268 rejects duplicate normalised exact keys with `ValueError`; distinct
+sequences at a repeated stop remain supported. This guard does not implement
+feed-version/calendar validation or resolve upstream sequence conflicts.
 
 The scheduled GTFS time is combined with the realtime trip `start_date`.
 
@@ -272,7 +297,7 @@ retaining their original service date context. A negative `delay_seconds` is
 preserved for an early arrival and zero is preserved for an exactly scheduled
 arrival; classification belongs to the analysis module.
 
-Missing actual arrival data or a missing static stop-time match does not create
+Missing absolute arrival-time data or a missing static stop-time match does not create
 a guessed delay record. Unix timestamps are converted using
 `ZoneInfo("Australia/Adelaide")`, so daylight-saving offsets are applied rather
 than hard-coded.
