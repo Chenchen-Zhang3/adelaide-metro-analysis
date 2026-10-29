@@ -1,5 +1,10 @@
 # Historical collection reliability and recovery
 
+**Latest validation:** [SCRUM-270 revalidation — 29 October 2026](#scrum-270-revalidation--29-october-2026).
+Local checks passed; CASR production uptime, Task Scheduler and real power-loss
+recovery remain unverified. **v2.1 remains ON HOLD.** The SCRUM-189 sections
+below preserve the original Sprint 3 evidence and test counts.
+
 SCRUM-189 / S3-C05. Local Windows validation: 2026-10-13.
 Base: `main` at `4dfe13452a85037651a20a55e6ea6382438251e9`.
 
@@ -198,3 +203,173 @@ If Done requires unattended production reliability, keep it pending until the
 client evidence above is checked. C06 engineering can proceed if its acceptance
 criteria do not depend on those unverified production claims. No automatic
 merge or Jira transition is performed.
+
+## SCRUM-270 revalidation — 29 October 2026
+
+This section supersedes the older production-evidence status above. Tested base:
+`efd8a7e2ebd24bf11595f803b1e14fca663dba40` (SCRUM-268 PR #69 and SCRUM-269
+PR #70 integrated). The October CASR backup failed integrity validation; its
+cause is unknown and this does not establish corruption of the live collector.
+It was not opened for this task. No independently verified replacement was
+provided for this validation. **v2.1 remains ON HOLD** for unresolved realtime
+stop_sequence compatibility. Local tests do not establish production uptime.
+
+### Scope and existing architecture
+
+Windows BAT resolves its application root and configured Python/static/DB/log
+paths, then invokes `backend.services.historical_collection`. The CLI acquires
+the Windows mutex, loads `stop_times.txt` and builds the exact index before
+schema initialisation. `GTFSRealtimeProcessingPipeline` provides its collector
+to `run_collection_and_persist`: fetch vehicles then trips, decode, validate,
+convert, adapt, persist one transaction, log, wait, repeat. The standalone
+processing pipeline does not persist. Existing Sprint 3 integration and Sprint 4
+database/backend reports were reviewed as historical evidence, not new CASR
+measurements. C05 already implemented the reliability/recovery tests below;
+SCRUM-270 reuses them without rebuilding functionality.
+
+Reviewed sources include realtime client/config/collector/decoder/validation/
+pipeline, historical runner, database repository/models/storage helpers,
+online backup, Windows mutex and BAT launcher. Operational procedures remain in
+the [Windows guide](../deployment/windows-historical-collector.md) and
+[CASR handover](../handover/casr-gtfs-data-collection-and-access.md).
+
+### Environment, scenarios and outcomes
+
+Local Windows; existing project Python 3.12.4; fresh temporary SQLite databases,
+injected feeds and bounded subprocesses. Checkpoint explicitly configured to
+900 seconds. No live requests, continuous unattended collector, real reboot,
+production/demo database access, migration or deployment occurred.
+
+**117 existing tests passed in 19.09 seconds; zero failures/errors/skips.**
+Modules: realtime client, collector, decoder, validation, logging, processing
+pipeline and persistence; historical runner, deployment, reliability and storage
+optimisation; GTFS integration. Supplemental experiments passed separately and
+are not counted as additional pytest cases.
+
+Final documentation-delivery review reran the 117-case selection plus API,
+analysis, hotspots, GTFS time-edge, database repository and historical-record
+tests: **187 passed in 22.25 seconds**, zero failures/errors/skips. This is a
+fresh expanded targeted run, not the historical C05 187-test full-suite result
+above. Supplemental experiments were rerun successfully as well. Fresh outputs
+are `final-review-tests.txt`, `final-review-tests.xml` and
+`final-review-experiments.json` in the external evidence directory; the initial
+117-test run and its 19.09-second timing remain the earlier validation record.
+
+| Scenario | Expected and observed outcome | Evidence |
+| --- | --- | --- |
+| Valid protobuf cycle | Both record types processed, transactional inserts and successful ledger row | Existing collector/pipeline/persistence tests passed |
+| Connection/timeout/429/5xx exhaustion | Three total attempts, two 5-second retry waits, next scheduled cycle after 60-second wait succeeds | Historical reliability tests passed |
+| HTTP 408 | Three attempts, waits `[5,5]`, bounded exhaustion | Supplemental experiment passed |
+| HTTP 403 | One attempt and no immediate retry | Existing and supplemental tests passed; future scheduled cycles still retry after polling delay |
+| Empty/malformed feed and invalid entities | Decode failure skips cycle; invalid entities do not discard valid neighbours | Existing tests passed |
+| Setup/write/ledger/COMMIT failure and actual write lock | No partially committed history/state/ledger; later cycle recovers | Existing historical reliability fault-injection tests passed |
+| Restart / abrupt exit before commit | Existing history preserved, journal recovery and state reuse | Existing bounded subprocess tests passed |
+| Shutdown | Stop event prevents another cycle; CLI handles injected KeyboardInterrupt; connections close | Existing tests passed; no power-loss durability claim |
+| Mutex | Second process rejected, then restart allowed; abrupt-exit handle release | Actual local Windows subprocess tests passed, same session only |
+| Logging | Startup, retry, decode/entity skips, persistence failures, success and shutdown observable; actual bounded rollover | Existing logging/reliability tests passed |
+| Long simulated sequence | 360 bounded simulated cycles with injected faults and restart, consistent ledger/state/history | Existing test passed; simulated time is not unattended production duration |
+
+Default request timeout is 10 seconds, with two retries after the first attempt.
+Polling is a 60-second delay after work; retry/processing time adds to the cycle
+duration. Permanent errors are not immediately retried, but the scheduler keeps
+attempting later cycles. A handled failure can leave a finite CLI run returning
+zero: verify completed-cycle logs and ledger activity, not exit status alone.
+
+### Explicit retention and recovery evidence
+
+One synthetic Trip Update per cycle, fixed trip/route/stop and scheduled arrival;
+no Vehicle Positions in this small count experiment. Expected inserts matched
+actual inserts in every row. The wider existing tests exercise both record types.
+
+| Observation offset (s) | Delay (s) | Expected/actual inserts | History rows | Current-state rows | Ledger rows |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 60 | 1 / 1 | 1 | 1 | 1 |
+| 60 | 60 | 0 / 0 | 1 | 1 | 2 |
+| 900 | 60 | 1 / 1 | 2 | 1 | 3 |
+| 960 | 120 | 1 / 1 | 3 | 1 | 4 |
+| 960, duplicate | 120 | 0 / 0 | 3 | 1 | 5 |
+
+The +900 observation is a checkpoint (last-seen gap 840 seconds, last-stored
+gap 900). Changed state is stored immediately; repeated state is suppressed.
+These five input observations are not five retained history rows or actual
+arrivals. No production growth rate was calculated.
+
+The existing `create_sqlite_backup` was called while a controlled source writer
+held `BEGIN IMMEDIATE` with an uncommitted state change. Backup contained the
+committed state, excluding the uncommitted change. Writer rollback left source
+bytes/SHA-256 unchanged. A second online backup into a distinct recovery path
+produced matching counts: 3 history, 1 current-state, 5 ledger, 0 vehicle rows.
+Source, backup and recovery each returned `PRAGMA integrity_check = ok`.
+Existing recovery tests also resumed collection in a recovered database while
+preserving source and snapshot. Missing-source, same-source/destination and
+existing-destination refusals passed; timestamp naming is covered by the suite.
+
+The utility uses the SQLite online backup API and checks destination integrity;
+it does not prove source provenance, timetable compatibility, completeness or
+power-loss durability. It has no overall backup deadline or atomic exclusive
+destination reservation for competing backup processes. Concurrent destination
+creation, persistent lock contention, disk-full and real power-loss scenarios
+were not tested. Coordinate one backup job and unique paths; larger operational
+hardening is a follow-up, not a change in this validation. Failed output may
+remain and must not be distributed as a verified backup. Never substitute a
+plain filesystem copy of an active SQLite file for this procedure.
+
+### Windows deployment and observability checklist
+
+An exact BAT copy ran in a disposable installation from a different working
+directory: missing Python returned 2; missing static file returned 3; configured
+real interpreter with `--help` returned 0 and displayed correctly rooted DB/log
+paths. This validates prerequisite/path dispatch only, not live collection.
+Dependencies were reviewed against `requirements-collector.txt`; no new runtime
+was installed. The real local mutex tests cover duplicate processes and restart.
+
+| Area | Local status | CASR evidence still required |
+| --- | --- | --- |
+| Startup and continuous loop | Locally verified, bounded simulation | Actual Python/dependency versions, configured absolute paths, static hash, launch and sustained logs |
+| Retry/error handling | Locally verified | Real feed access, freshness, outage/error monitoring |
+| Persistence/checkpoints | Locally verified | Verified production backup and ledger/log correlation |
+| Backup/recovery | Locally verified including active transaction | Operator backup logs, source/transfer hashes, retention and restore drill |
+| Duplicate protection | Locally verified within one Windows session | Dedicated account/task; no overlapping instances or separate collectors |
+| Logging | 5 MiB rotation, five backups; rollover verified | Writable log path, monitoring ownership and adequate retention |
+| Task Scheduler | Instructions reviewed, not actual CASR settings | Startup trigger, account, filesystem permissions, restart-on-failure, non-overlap, command and Start-in directory |
+| Power recovery | Not verified | Firmware power restoration, sleep policy, controlled reboot and recovery evidence |
+| Production integrity/uptime | Not verified; supplied backup failed | Separately verified source-side snapshot and corresponding logs |
+| Static compatibility / release | Unresolved / HOLD | Producer sequence semantics and feed linkage resolved before release approval |
+
+Existing Scheduler guidance includes startup delay, dedicated account, explicit
+cmd/BAT path and working directory, restart every five minutes for three attempts,
+and no overlapping tasks. These are recommendations, not confirmation of CASR
+configuration. Task Scheduler End can terminate abruptly; it is not equivalent
+to graceful Ctrl+C. No CASR host settings were accessed or changed.
+
+Logs distinguish successful, failed and skipped cycles; the ledger records only
+successful transactions and often uses feed observation time. Missing intervals
+or stale/repeated timestamps do not prove process downtime. Correlate logs,
+ledger, source freshness and host/task events; unknown periods remain unknown.
+Raw protobuf payloads are not intentionally logged, and configured public URLs
+contain no credentials. However URL/error logging is not a general redaction
+layer: do not put credentials in URLs or log messages; review logging before any
+authenticated-feed change. No credential-bearing endpoint was used in testing.
+
+### Handover decision and reproducibility
+
+Local controlled acceptance checks passed. Full CASR operational acceptance is
+**pending**, not production-ready. Obtain a source-verified replacement backup,
+validate integrity read-only before analysis, then confirm scheduler/reboot,
+monitoring ownership and sustained operation using client evidence. Resolve
+stop_sequence compatibility before reconsidering v2.1. The failed backup does
+not establish the cause or condition of the live CASR database.
+
+No application code, schema, frontend, static matching or deployment configuration
+was changed. This report extension is the only repository change. During the
+initial local validation, no commit, push, PR, merge, deployment package or
+release was made; subsequent documentation delivery does not approve deployment.
+
+External evidence directory for this run: `scrum270-evidence` in the task
+workspace, outside the Git worktree. `tests.xml` contains all 117 case names and
+outcomes; `tests.txt` records the run; `experiments.json` contains cycle counts,
+hash and launcher outputs. `scrum270_experiments.py` beside that directory
+reproduces the supplemental tests using fresh temporary data. Run the named
+pytest modules above with checkpoint environment value 900; never point tests
+at CASR data. All waits/processes are bounded; synthetic experiment files are
+removed on completion. The prior regression counts above remain historical.
