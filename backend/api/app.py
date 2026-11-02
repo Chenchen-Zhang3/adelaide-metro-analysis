@@ -1,5 +1,6 @@
 """Backend API for Adelaide Metro data."""
 
+import os
 import sqlite3
 from datetime import datetime, timezone
 
@@ -12,9 +13,11 @@ from backend.database.repository import (
     get_routes_by_stop,
     get_stop,
 )
+from backend.services import static_map_data
 from backend.services.pipeline import query_and_analyse
 from backend.services.vehicle_history import query_vehicle_history
 from backend.services.recorded_map_data import (
+    MAP_DATA_ENV as DEMO_MAP_DATA_ENV,
     MapDataUnavailableError,
     load_route_map_data,
 )
@@ -57,6 +60,11 @@ def handle_database_error(error):
     return jsonify({"error": "Database error"}), 500
 
 
+@app.errorhandler(MapDataUnavailableError)
+def handle_map_data_error(error):
+    return jsonify({"error": str(error)}), 503
+
+
 @app.errorhandler(404)
 def handle_not_found(error):
     """Return a JSON response for unknown API routes."""
@@ -68,7 +76,8 @@ def handle_not_found(error):
 def get_stops():
     """Return Adelaide Metro stops."""
 
-    stops = get_all_stops()
+    stops = (static_map_data.load_catalog()["stops"]
+             if static_map_data.configured() else get_all_stops())
 
     return jsonify(stops)
 
@@ -77,7 +86,8 @@ def get_stops():
 def get_routes():
     """Return Adelaide Metro routes."""
 
-    routes = get_all_routes()
+    routes = (static_map_data.load_catalog()["routes"]
+              if static_map_data.configured() else get_all_routes())
 
     return jsonify(routes)
 
@@ -86,7 +96,9 @@ def get_routes():
 def get_stop_detail(stop_id):
     """Return details for one Adelaide Metro stop."""
 
-    stop = get_stop(stop_id)
+    stop = (next((row for row in static_map_data.load_catalog()["stops"]
+                  if row["stop_id"] == stop_id), None)
+            if static_map_data.configured() else get_stop(stop_id))
 
     if stop is None:
         return jsonify({"error": "Stop not found"}), 404
@@ -98,7 +110,13 @@ def get_stop_detail(stop_id):
 def get_stop_routes(stop_id):
     """Return routes that serve the selected stop."""
 
-    routes = get_routes_by_stop(stop_id)
+    if static_map_data.configured():
+        catalog = static_map_data.load_catalog()
+        stop = next((row for row in catalog["stops"] if row["stop_id"] == stop_id), None)
+        routes = [row for row in catalog["routes"]
+                  if stop and row["route_id"] in stop["route_ids"]]
+    else:
+        routes = get_routes_by_stop(stop_id)
 
     return jsonify(routes)
 
@@ -124,13 +142,23 @@ def get_route_performance(route_id):
 
 @app.get("/api/routes/<route_id>/map-data")
 def get_recorded_route_map_data(route_id):
-    """Return official shapes and related stops/trips for the recorded demo."""
-    try:
+    """Prefer configured recorded demo; opt in to a separate static publication."""
+    source = request.args.get("source")
+    if source not in (None, "static", "recorded"):
+        return jsonify({"error": "source must be static or recorded"}), 400
+    if source == "static":
+        data = static_map_data.load_static_route_map_data(route_id)
+    elif source == "recorded" or os.environ.get(DEMO_MAP_DATA_ENV):
+        # Corrupt demo artifacts fail closed, never silently become static data.
         data = load_route_map_data(route_id)
-    except MapDataUnavailableError as error:
-        return jsonify({"error": str(error)}), 503
+        if data is None and source is None and static_map_data.configured():
+            data = static_map_data.load_static_route_map_data(route_id)
+    elif static_map_data.configured():
+        data = static_map_data.load_static_route_map_data(route_id)
+    else:
+        data = load_route_map_data(route_id)
     if data is None:
-        return jsonify({"error": "Recorded route map data not found"}), 404
+        return jsonify({"error": "Route map data not found"}), 404
     return jsonify(data)
 
 
