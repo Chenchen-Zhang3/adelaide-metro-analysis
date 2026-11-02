@@ -2,7 +2,10 @@
 
 For CASR researchers, operators and future developers. Reviewed on 27 October
 2026 against main `0b67e7f749a833ba937b118cf63c240754a6c2df`, including
-SCRUM-268 (PR #69). This guide describes the implementation at that revision.
+SCRUM-268 (PR #69). That review remains the baseline for this guide.
+Section 8's performance API contract was updated on 2 November 2026 to document
+optional timezone-aware observation-time filters and their local regression
+tests; this update does not establish CASR deployment or production acceptance.
 
 **Production evidence boundary:** the October CASR v2 backup failed
 `PRAGMA integrity_check` with `database disk image is malformed`. Preserve that
@@ -474,8 +477,8 @@ documentation verification; examples were executed through Flask's test client.
 | `/api/stops/<stop_id>` | Stop details; unknown stop returns 404 |
 | `/api/stops/<stop_id>/routes` | Join through stop-times/trips/routes; unknown/unlinked stop returns `[]` |
 | `/api/routes/<route_id>/vehicle-positions` | Required offset-aware `start_time`, `end_time`; optional `limit` (default 500, 1–1000), `offset` (default 0); half-open interval, deterministic order, `next_offset`; missing route dimension returns 404, invalid parameters 400 |
-| `/api/routes/<route_id>/performance` | Route prediction analysis over available records; this handler does **not** read query-string time filters; no result returns 404 |
-| `/api/stops/<stop_id>/performance` | Stop prediction analysis; likewise no query-string time filtering; no result returns 404 |
+| `/api/routes/<route_id>/performance` | Route prediction analysis; optional offset-aware `start_time`, `end_time`; inclusive observation-time bounds; invalid timestamp/range 400, no result 404 |
+| `/api/stops/<stop_id>/performance` | Stop prediction analysis across routes; same optional time filters and 400/404 behavior as route performance |
 | `/api/analysis/hotspots` | Optional `route_id`, `stop_id`, `start_time`, `end_time`, `min_services` (default 10); inclusive observation-time bounds via repository; returns `hotspots` and `total_hotspots` |
 | `/api/routes/<route_id>/map-data` | Recorded demo artifacts configured by `ADELAIDE_METRO_DEMO_MAP_DATA_PATH`; publisher supports G10/M44/506 only; absent route 404, unavailable/inconsistent artifacts 503 |
 
@@ -485,6 +488,39 @@ Use repository/CSV/direct SQL for raw prediction history. Hotspot `min_services`
 must be positive; the current handler defaults to 10 for non-integer input
 instead of rejecting it. Keep queries small: performance/hotspot paths are not
 paginated and may scan substantial history.
+
+Performance filters apply to the prediction's **observation time** (`observed_at`),
+not scheduled or actual arrival time. Either bound may be supplied alone. Both
+ends are inclusive, matching the existing Trip Update/hotspot convention;
+equal bounds select observations at that instant. Vehicle history retains its
+separate end-exclusive convention. No existing interval convention is changed.
+Fractional-second query bounds are compared without truncation against the
+stored whole-second observations. Offsets are compared as actual instants:
+use `+09:30` for September Adelaide times and `+10:30` during October daylight
+saving, or send UTC (`Z`). URL-encode a literal `+` as `%2B` (or use a query
+parameter encoder). Naive dates/times and explicitly empty filters return 400.
+
+For example, a route request for the closed October observation window is:
+
+```text
+GET /api/routes/G10/performance?start_time=2026-10-21T08%3A00%3A00%2B10%3A30&end_time=2026-10-21T09%3A00%3A00%2B10%3A30
+```
+
+A successful response retains the existing metric fields (including
+`total_services` and `average_delay`). A valid window with no matching records
+returns the existing `404 {"error":"Route performance not found"}` (or
+`Stop performance not found`), without falling back to all history or inventing
+zero delay. Omitting both filters retains all-history behavior. These remain
+prediction aggregates: the latest prediction per scheduled stop visit is
+selected **within the filtered observations**. Sample counts do not establish
+completed trips or actual observed arrivals. Stop performance remains across
+all routes at the stop; this change adds no route filter to that endpoint.
+
+Frontend callers must send the selected window explicitly; this Backend change
+does not wire the playback controls into performance/hotspot requests or fix
+the frontend's fixed-offset date parsing. When using the same two timestamps
+for vehicle playback and analysis, remember that analysis includes an
+observation exactly at `end_time`, while vehicle playback excludes it.
 
 The following verified response is **synthetic**: `DOC1`, `0001`, `S-DOC` and
 `V-DOC` are documentation fixture IDs, not a supplied CASR dataset. Real requests
