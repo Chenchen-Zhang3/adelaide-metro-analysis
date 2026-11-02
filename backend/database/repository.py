@@ -5,6 +5,7 @@ from time import time
 
 from backend.database.connection import get_connection
 from backend.database.historical_storage import (
+    ADELAIDE_TIMEZONE,
     configured_trip_update_checkpoint_seconds,
     derived_actual_arrival,
     epoch_to_adelaide_iso,
@@ -530,8 +531,21 @@ def _trip_update_row(row):
 
 
 def _trip_update_range(start_time, end_time):
-    start_epoch = iso_timestamp_to_epoch(start_time) if start_time is not None else None
-    end_epoch = iso_timestamp_to_epoch(end_time) if end_time is not None else None
+    """Inclusive read bounds; preserve fractional seconds rather than truncate.
+
+    Legacy repository callers may still supply naive Adelaide timestamps.
+    HTTP performance handlers require explicit offsets before calling here.
+    """
+    def epoch_bound(value):
+        if value in (None, ""):
+            return None
+        parsed = datetime.fromisoformat(str(value))
+        if parsed.utcoffset() is None:
+            parsed = parsed.replace(tzinfo=ADELAIDE_TIMEZONE)
+        return parsed.timestamp()
+
+    start_epoch = epoch_bound(start_time)
+    end_epoch = epoch_bound(end_time)
     if start_epoch is not None and end_epoch is not None and start_epoch > end_epoch:
         raise ValueError("start_time must be before or equal to end_time")
     return start_epoch, end_epoch

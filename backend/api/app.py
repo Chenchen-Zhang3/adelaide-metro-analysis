@@ -1,6 +1,7 @@
 """Backend API for Adelaide Metro data."""
 
 import sqlite3
+from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
 from flask_cors import CORS
@@ -21,6 +22,32 @@ from backend.services.recorded_map_data import (
 
 app = Flask(__name__)
 CORS(app)
+
+
+def performance_time_filters():
+    """Validate optional inclusive observation-time bounds for performance."""
+    filters = {}
+    instants = {}
+    for name in ("start_time", "end_time"):
+        if name not in request.args:
+            continue
+        try:
+            instant = datetime.fromisoformat(request.args[name])
+            if instant.utcoffset() is None:
+                raise ValueError("Missing UTC offset")
+            instant = instant.astimezone(timezone.utc)
+        except (ValueError, OverflowError) as error:
+            raise ValueError(
+                f"{name} must be an ISO 8601 timestamp with a UTC offset"
+            ) from error
+        instants[name] = instant
+        filters[name] = instant.isoformat()
+    if (
+        "start_time" in instants and "end_time" in instants
+        and instants["start_time"] > instants["end_time"]
+    ):
+        raise ValueError("start_time must be before or equal to end_time")
+    return filters
 
 
 @app.errorhandler(sqlite3.Error)
@@ -80,7 +107,12 @@ def get_stop_routes(stop_id):
 def get_route_performance(route_id):
     """Return performance data for one route."""
 
-    analysis = query_and_analyse(route_id=route_id)
+    try:
+        analysis = query_and_analyse(
+            route_id=route_id, **performance_time_filters()
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
 
     performance = analysis["route_performance"].get(route_id)
 
@@ -118,7 +150,12 @@ def get_route_vehicle_history(route_id):
 def get_stop_performance(stop_id):
     """Return performance data for one stop."""
 
-    analysis = query_and_analyse(stop_id=stop_id)
+    try:
+        analysis = query_and_analyse(
+            stop_id=stop_id, **performance_time_filters()
+        )
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
 
     performance = analysis["stop_performance"].get(stop_id)
 

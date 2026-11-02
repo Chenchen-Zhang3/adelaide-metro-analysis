@@ -604,3 +604,28 @@ def test_vehicle_position_combined_filters():
     assert results[0]["route_id"] == target_vehicle["route_id"]
     assert results[0]["latitude"] == target_vehicle["latitude"]
     assert results[0]["longitude"] == target_vehicle["longitude"]
+
+
+@pytest.mark.parametrize("query", [
+    get_trip_updates_by_time_range, get_trip_updates_filtered,
+])
+def test_trip_update_query_preserves_fractional_read_bounds(query):
+    update = load_fixture("sample_trip_updates.json")[0]
+    insert_trip_update(update)
+    timestamp = datetime.fromisoformat(update["timestamp"])
+    results = query(
+        start_time=(timestamp + timedelta(microseconds=100000)).isoformat(),
+        end_time=(timestamp + timedelta(microseconds=900000)).isoformat(),
+    )
+    assert results == []
+
+
+@pytest.mark.parametrize("query", [
+    get_trip_updates_by_time_range, get_trip_updates_filtered,
+])
+def test_trip_update_query_rejects_reversed_fractional_bounds(query):
+    with pytest.raises(ValueError, match="start_time"):
+        query(
+            start_time="2026-10-20T09:00:00.9+10:30",
+            end_time="2026-10-20T09:00:00.1+10:30",
+        )
