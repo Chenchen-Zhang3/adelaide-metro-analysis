@@ -14,6 +14,8 @@ from backend.database.repository import (
     get_stop,
 )
 from backend.services import static_map_data
+from backend.services.stop_delays import query_network_stop_delays
+from backend.database.stop_delays import StopDelayLimitError
 from backend.services.pipeline import query_and_analyse
 from backend.services.vehicle_history import query_vehicle_history
 from backend.services.recorded_map_data import (
@@ -25,6 +27,25 @@ from backend.services.recorded_map_data import (
 
 app = Flask(__name__)
 CORS(app)
+
+
+@app.get("/api/analysis/stop-delays")
+def get_network_stop_delays():
+    """Bounded bulk statistics; never fall back to an unfiltered query."""
+    allowed = {"start_time", "end_time", "route_id", "min_samples", "scope"}
+    if set(request.args) - allowed or any(len(request.args.getlist(k)) != 1 for k in request.args):
+        return jsonify({"error": "Unknown or repeated query parameter"}), 400
+    try:
+        return jsonify(query_network_stop_delays(
+            request.args.get("start_time"), request.args.get("end_time"),
+            route_id=request.args.get("route_id"),
+            min_samples=request.args.get("min_samples", "10"),
+            scope=request.args.get("scope", "observed"),
+        ))
+    except StopDelayLimitError as error:
+        return jsonify({"error": str(error), "code": "analysis_limit_exceeded"}), 422
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
 
 
 def performance_time_filters():
