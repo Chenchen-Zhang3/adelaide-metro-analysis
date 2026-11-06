@@ -1,5 +1,5 @@
 
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "http://127.0.0.1:5001";
 const ADELAIDE_LAT = -34.9285;
 const ADELAIDE_LON = 138.6007;
 
@@ -178,6 +178,7 @@ async function loadStops() {
         }));
 
         createStopMarkers();
+        window.dispatchEvent(new CustomEvent("adelaide:stops-loaded", { detail: { stops: stopData } }));
 
         stopCount.textContent = `${stopData.length} stops`;
 
@@ -358,7 +359,7 @@ async function showRouteOnMap(routeId) {
 
     try {
         const response = await fetch(
-            `${API_BASE_URL}/api/routes/${encodeURIComponent(routeId)}/map-data`
+            `${API_BASE_URL}/api/routes/${encodeURIComponent(routeId)}/map-data?source=static`
         );
 
         if (
@@ -371,13 +372,13 @@ async function showRouteOnMap(routeId) {
         if (!response.ok) {
             if (response.status === 404) {
                 throw new Error(
-                    "Recorded map data is not available for this route."
+                    "Static route geometry is not available for this route."
                 );
             }
 
             if (response.status === 503) {
                 throw new Error(
-                    "Recorded route map data is not configured on the backend."
+                    "Static GTFS route catalogue is not configured on the backend."
                 );
             }
 
@@ -399,7 +400,7 @@ async function showRouteOnMap(routeId) {
             data.geometry.features.length === 0
         ) {
             showMapMessage(
-                "No recorded route geometry is available for this route."
+                "No static route geometry is available for this route."
             );
             return;
         }
