@@ -92,6 +92,10 @@
     });
 
     function setMode(active) {
+        if (!active) {
+            state.request++;
+            state.controller?.abort();
+        }
         state.active = active;
         if (state.layer) {
             if (active && state.loaded) state.layer.addTo(map);
@@ -163,6 +167,9 @@
                 : "Showing the selected delay or coverage category.";
     }
     function resetOnFailure(message) {
+        // Invalidate any in-flight response before clearing the displayed result.
+        state.request++;
+        state.controller?.abort();
         state.loaded = false;
         state.results.clear();
         state.coverage = null;
@@ -189,7 +196,7 @@
             const start = adelaideInstant($("networkDelayStart").value);
             const end = adelaideInstant($("networkDelayEnd").value);
             const duration = end - start;
-            if (duration < 0 || duration > 3600000) throw new Error("Select a time window between 0 and 60 minutes.");
+            if (duration <= 0 || duration > 3600000) throw new Error("Select a time window greater than 0 and at most 60 minutes.");
             const params = new URLSearchParams({ start_time: start.toISOString(), end_time: end.toISOString(), scope: "static", min_samples: $("networkDelayMinSamples").value });
             if ($("networkDelayRouteOnly").checked && routeSelect.value) params.set("route_id", routeSelect.value);
             const response = await fetch(`${API_BASE_URL}/api/analysis/stop-delays?${params}`, { signal: state.controller.signal });
@@ -238,7 +245,7 @@
         document.head.appendChild(styles);
         const picker = $("networkDelayRoutePicker");
         function syncPicker() {
-            const current = picker.value || routeSelect.value;
+            const current = routeSelect.value || picker.value;
             picker.innerHTML = routeSelect.innerHTML;
             picker.value = [...picker.options].some(option => option.value === current) ? current : "";
         }
@@ -265,6 +272,12 @@
         });
         $("networkDelayToggle").addEventListener("change", event => setMode(event.target.checked));
         $("networkDelayLoad").addEventListener("click", load);
+        // A changed query must never leave the previous window's colours visible.
+        for (const id of ["networkDelayStart", "networkDelayEnd", "networkDelayMinSamples"]) {
+            $(id).addEventListener("change", () => {
+                if (state.active) resetOnFailure("Analysis settings changed. Load prediction delays again.");
+            });
+        }
         $("networkDelayFilter").addEventListener("change", () => { if (state.loaded) draw(); });
         $("networkDelayRouteOnly").addEventListener("change", () => {
             if (state.loaded) resetOnFailure("Route filter changed. Reload predictions to apply it.");
