@@ -3,6 +3,26 @@ from contextlib import closing
 from datetime import datetime, timezone
 
 from backend.database.connection import get_connection
+from backend.services import static_map_data
+
+
+def _known_route(connection, route_id):
+    """Validate identity only; never join static schedules to recorded history.
+
+    Existing dimensions and indexed historical identity take precedence over
+    optional static metadata. An unavailable configured catalog remains an error
+    when it is needed to distinguish unknown routes from known empty history.
+    """
+    if connection.execute("SELECT 1 FROM routes WHERE route_id = ?", (route_id,)).fetchone():
+        return True
+    if connection.execute(
+        "SELECT 1 FROM vehicle_positions WHERE route_id = ? LIMIT 1", (route_id,)
+    ).fetchone():
+        return True
+    if static_map_data.configured():
+        return any(route["route_id"] == route_id
+                   for route in static_map_data.load_catalog()["routes"])
+    return False
 
 
 def query_vehicle_history(route_id, start_time=None, end_time=None,
@@ -25,7 +45,7 @@ def query_vehicle_history(route_id, start_time=None, end_time=None,
     if not 1 <= limit <= 1000 or not 0 <= offset <= 2**63 - 1:
         raise ValueError("limit must be 1..1000 and offset must be a non-negative SQLite integer")
     with closing(get_connection()) as connection:
-        if not connection.execute("SELECT 1 FROM routes WHERE route_id = ?", (route_id,)).fetchone():
+        if not _known_route(connection, route_id):
             return None
         rows = connection.execute(
             "SELECT * FROM vehicle_positions WHERE route_id = ? "
