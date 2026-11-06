@@ -1,185 +1,162 @@
-## Sprint 5 Automated Integration Testing
 
-**Test Date:** 3 November 2026  
+# Sprint 5 — Final Integration Test Report
+
+**Project:** Adelaide Metro Transport Analysis  
+**Client:** Centre for Automotive Safety Research (CASR)  
 **Tested by:** Chenchen Zhang  
-**Git Branch:** main  
-**Git Commit:** `1f5180f`  
-**Python Version:** 3.12.2  
-**pytest Version:** 9.2.0
+**Test Period:** 3–6 November 2026  
+**Branch:** main  
+**Python:** 3.12.2  
+**Overall Status:** PASS WITH OUTSTANDING ITEMS
 
-### Test Execution
+## 1. Test Objective
 
-The automated test suite was executed on the latest main branch to verify the backend and project-level functionality following Sprint 5 integration.
+This report documents Sprint 5 testing of the integrated Adelaide Metro Transport Analysis website, including automated backend testing, database verification, real historical data integration, and browser-based functional testing.
 
-**Command:**
+Testing was performed using the original recorded demo dataset and the separate CASR v2 historical database.
 
-`python -m pytest backend/tests tests -q`
+## 2. Automated Testing
 
-### Test Results
+All completed automated test runs passed.
 
-| Test Metric | Result |
-|---|---|
-| Tests Passed | 356 |
-| Tests Failed | 0 |
-| Execution Time | 72.73 seconds |
-| Overall Status | PASS |
+| Date | Test / Command | Result | Duration |
+|---|---|---|---|
+| 3 Nov | `python -m pytest backend/tests tests -q` | 356 passed | 72.73s |
+| 6 Nov | `python -m pytest backend/tests/test_stop_delays.py -v` | 41 passed | 12.90s |
+| 6 Nov | `python -m pytest backend/tests/test_analysis.py backend/tests/test_hotspots.py -v` | 19 passed | 0.49s |
+| 6 Nov | `python -m pytest -q` | 397 passed | 74.89s |
 
-All 356 tests in the executed suite passed successfully. No failures were reported.
+The first run used commit `1f5180f`. The Stop Delays and Hotspots tests were recorded against commit `59c6ee1`.
 
-**Test Evidence:** `docs/testing/evidence/sprint5/pytest-356-passed-20261103.png`
+The initial full-suite run on 6 November was interrupted during collection by a legacy database protection check. The suite was rerun using a new temporary SQLite database path:
 
-### Next Verification Steps
+```powershell
+$env:ADELAIDE_METRO_DATABASE_PATH = Join-Path $env:TEMP ("adelaide-metro-test-" + [guid]::NewGuid().ToString("N") + ".db")
+python -m pytest -q
+```
 
-Browser-based end-to-end testing is still required to verify the complete website workflow, including route selection, stop information, historical vehicle playback, delay hotspots, and the updated citywide map.
+All 397 tests passed in the isolated environment. This is the pre-fix regression baseline. The suite must be rerun after the final backend changes are merged.
 
-These results will be recorded separately before final client acceptance and handover.
+**Test Evidence:**
+- `docs/testing/evidence/sprint5/pytest-356-passed-20261103.png`
+- `docs/testing/evidence/sprint5/stop-delays-api-test.png`
+- `docs/testing/evidence/sprint5/delay-analysis-hotspots-test.png`
+- `docs/testing/evidence/sprint5/sprint5-pytest-397-passed-pre-fix.png`
 
-## Sprint 5 — Stop Delays API Verification
+These test counts represent separate runs and must not be added together.
 
-**Test Date:** 6 November 2026  
-**Tested by:** Chenchen Zhang  
-**Git Branch:** main  
-**Git Commit:** `59c6ee1`
-**Test Type:** Backend API Automated Testing
+## 3. Database and Historical Data Verification
 
-### 1. Test Objective
+The original recorded demo database, `data/demo/adelaide_metro_demo.db`, passed the read-only SQLite `PRAGMA integrity_check`.
 
-The purpose of this test was to verify the newly integrated Stop Delays API before the final frontend integration.
+The CASR v2 database, `adelaide_metro_history_v2_20261022_140923.db`, was independently verified and also returned `ok`.
 
-The endpoint `GET /api/analysis/stop-delays` provides historical predicted delay statistics that can support network-wide delay visualisation for CASR researchers.
+| CASR v2 Data | Records |
+|---|---:|
+| Historical trip updates | 7,536,553 |
+| Historical vehicle positions | 3,691,004 |
+| Routes dimension table | 0 |
+| Stops dimension table | 0 |
+| Trips dimension table | 0 |
 
-This verification was performed independently of the frontend to ensure that the backend functionality could be tested before the final map updates were merged.
+The prepared GTFS Static 1710 network contained 384 routes and 7,241 stops or locations. Historical coverage did not match the full static network: 198 of the 231 historical prediction route IDs matched the static catalog.
 
-### 2. Test Execution
-
-**Test Command:**
-
-`python -m pytest backend/tests/test_stop_delays.py -v`
-
-**Test File:**
-
-`backend/tests/test_stop_delays.py`
-
-### 3. Test Results
-
-| Test Metric | Result |
-|---|---|
-| Tests Passed | 41 |
-| Tests Failed | 0 |
-| Execution Time | 12.90 seconds |
-| Overall Status | PASS |
-
-All test cases in `test_stop_delays.py` passed successfully during the local test execution.
-
-**Evidence:** `docs/testing/evidence/sprint5/stop-delays-api-test.png`
-
-### 4. Verification Scope
-
-This test verifies the behaviour covered by the Stop Delays API automated test suite.
-
-The tests provide evidence of backend functionality but do not confirm that the new delay statistics are correctly displayed on the final interactive map.
-
-### 5. Remaining Verification
-
-The following checks will be completed after the final frontend integration:
-
-- Network-wide stop delay visualisation on the map.
-- Correct delay colour categories and legend.
-- Display of delay statistics in stop information panels.
-- Appropriate handling of stops without available historical data.
-- Final browser-based end-to-end testing.
-
-**Current Status:** Backend API automated verification passed. Final frontend integration and client acceptance testing remain pending.
-
-## Sprint 5 — Delay Analysis and Hotspots Backend Verification
-
-**Test Date:** 6 November 2026  
-**Tested by:** Chenchen Zhang  
-**Git Branch:** main  
-**Git Commit:** `59c6ee1`  
-**Test Type:** Backend Automated Testing
-
-### 1. Test Objective
-
-The purpose of this test was to verify the delay analysis and historical delay hotspot functionality independently of the frontend.
-
-These features support CASR researchers by providing delay metrics, punctuality information, and identification of stops with significant historical delays.
-
-### 2. Test Execution
-
-**Test Command:**
-
-`python -m pytest backend/tests/test_analysis.py backend/tests/test_hotspots.py -v`
-
-**Test Files:**
-- `backend/tests/test_analysis.py`
-- `backend/tests/test_hotspots.py`
-
-### 3. Test Results
-
-| Test Metric | Result |
-|---|---|
-| Tests Passed | 19 |
-| Tests Failed | 0 |
-| Execution Time | 0.49 seconds |
-| Overall Status | PASS |
-
-All 19 automated tests passed successfully.
-
-### 4. Verification Scope
-
-The executed tests cover delay metric calculations, punctuality-related metrics, aggregation, hotspot ranking, minimum service thresholds, invalid delay handling, and API response behaviour.
-
-These results provide evidence of backend functionality. They do not independently confirm the correctness of the final frontend visualisation or the suitability of every business threshold for CASR's research.
-
-### 5. Remaining Verification
-
-The final browser-based integration test will verify that delay information and hotspot results are displayed correctly in the frontend after the final changes have been merged into main.
-
-**Evidence:** `docs/testing/evidence/sprint5/delay-analysis-hotspots-test.png`
-
-**Current Status:** PASS — Backend automated verification completed. Final frontend integration remains pending.
-
-## Sprint 5 — Demo Database Integrity Verification
-
-**Test Date:** 6 November 2026  
-**Tested by:** Chenchen Zhang  
-**Git Branch:** main  
-**Git Commit:** `59c6ee1`  
-**Test Type:** SQLite Database Integrity Check
-
-### 1. Test Objective
-
-The purpose of this test was to verify the structural integrity of the local historical demo database used for the Adelaide Metro Transport Analysis website.
-
-This verification was performed independently of the frontend and did not require any changes to the database.
-
-### 2. Test Environment
-
-**Database File:** `data/demo/adelaide_metro_demo.db`
-
-**Database Engine:** SQLite
-
-**Access Mode:** Read-only
-
-**Verification Command:** `PRAGMA integrity_check`
-
-### 3. Test Results
-
-| Test Metric | Result |
-|---|---|
-| Database File Accessible | PASS |
-| SQLite Integrity Check | ok |
-| Overall Status | PASS |
-
-The SQLite integrity check completed successfully and returned `ok`, indicating that no structural integrity errors were detected in the local demo database.
-
-### 4. Verification Scope and Limitations
-
-This test verifies the structural integrity of the local demo SQLite database. It does not confirm the accuracy, completeness or coverage of the historical transport records.
-
-The result also does not apply to the separate CASR production database backup, which requires independent verification.
+Both databases were preserved without modifying their original historical records.
 
 **Evidence:** `docs/testing/evidence/sprint5/demo-database-integrity-test.png`
 
-**Current Status:** PASS — Local demo database integrity verified.
+## 4. CASR v2 API and Browser Integration Testing
+
+**Test Date:** 6 November 2026  
+**Backend:** `http://127.0.0.1:5002`  
+**Test Frontend:** `http://127.0.0.1:8001/frontend-casr-test/`
+
+The CASR v2 backend and a separate frontend copy were used to protect the original demo environment.
+
+### Backend API Results
+
+| Feature | Result | Observation |
+|---|---|---|
+| Network-wide prediction delays | PASS | Historical delay data returned |
+| Route Performance — G10 | PASS | HTTP 200; 415 samples; 2.04 min average delay |
+| Stop Performance — 3413 | PASS | HTTP 200; 13 samples; 2.51 min average delay |
+| Historical Delay Hotspots | PASS | HTTP 200; ranked hotspot results |
+| CASR v2 Vehicle Playback | BLOCKED | HTTP 404 — Route not found |
+
+The time-bounded performance requests used 17 October 2026, 09:00–09:30 Adelaide time.
+
+### Browser Results
+
+| Feature | Result | Observation |
+|---|---|---|
+| City-wide network map | PASS | 384 routes and 7,241 locations displayed |
+| Route switching | PASS | G10 to M44 updated map and performance |
+| Route Performance | PASS | G10 and M44 statistics displayed |
+| Selected Stop | PASS | Blue marker updated stop details and performance |
+| Nearest Stop | PASS | Map selection returned Stop 101559, 210 m away |
+| Network-wide Delay Map | PASS | Delay markers, legend and available-data popup |
+| Insufficient Data | PASS | Two samples displayed as N/A |
+| No Data summary | PASS | Counts and legend displayed |
+| No Data marker / popup | PENDING | Individual marker not verified |
+| Historical Delay Hotspots | PASS | Ranked list, visibility toggle and popup worked |
+| Historical Vehicle Playback | BLOCKED | Unable to load history (404) |
+
+For the network-wide delay analysis, the browser displayed 31 stops with available statistics, 5,144 with insufficient data, and 2,065 with no data among 7,240 eligible stops.
+
+The Stop 3413 popup displayed a 2.51-minute average predicted delay, 61.54% predicted on-time rate and 13 prediction samples.
+
+The hotspot panel displayed 114 mapped ranked hotspots. Hiding and restoring hotspot markers worked correctly, and selecting an orange marker displayed its historical statistics.
+
+Browser performance values were not directly compared against the time-bounded API results because their analysis windows were not confirmed to be identical.
+
+## 5. Outstanding Issue — CASR v2 Historical Playback
+
+**Status:** BLOCKED — Backend compatibility issue
+
+During browser testing, Historical Vehicle Playback returned:
+
+`HTTP 404 — Route not found`
+
+The root cause was traced to `backend/services/vehicle_history.py`.
+
+The `query_vehicle_history()` function first checks the historical database's `routes` table:
+
+```sql
+SELECT 1 FROM routes WHERE route_id = ?
+```
+
+However, the CASR v2 `routes` table is empty, despite containing approximately 3.69 million vehicle-position observations. The validation therefore returns `None`, preventing the endpoint from querying those observations.
+
+The issue was communicated to the responsible backend team member.
+
+The required fix should support an appropriate route-validation source while preserving the original recorded demo behaviour. A valid route with no observations should also be distinguished from an unknown route.
+
+After the fix, the following must be retested:
+
+- Vehicle-history API response
+- Load Vehicle History
+- Play, Pause and Reset
+- Route switching during or after playback
+- Original demo playback compatibility
+
+The recorded three-route demo remains available as a fallback. The CASR v2 playback function must not be reported as working until retested.
+
+## 6. Final Test Summary and Handover Status
+
+Sprint 5 testing confirmed that the integrated website can display the city-wide Adelaide Metro static network and analyse real historical transport predictions using the CASR v2 dataset.
+
+Verified functionality includes route and stop performance, network-wide historical prediction delays, ranked delay hotspots, selected-stop information, map-based nearest-stop search and route switching.
+
+The full pre-fix regression suite passed **397 tests in 74.89 seconds**, with no test failures.
+
+The following items remain before final acceptance:
+
+1. Complete and verify CASR v2 Historical Vehicle Playback compatibility.
+2. Rerun automated regression tests after the final code merge.
+3. Confirm final dataset access and reproducible setup instructions.
+4. Document the unverified No Data marker behaviour and any remaining limitations.
+5. Record the final verified Git commit and test evidence.
+
+**Final Status: PASS WITH OUTSTANDING ITEMS.**
+
+Core historical analysis and frontend integration were verified. Full client acceptance remains pending the outstanding playback fix and final regression testing.

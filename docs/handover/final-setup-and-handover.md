@@ -1,303 +1,302 @@
+
 # Adelaide Metro Transport Analysis — Final Setup and Handover Guide
 
+**Project:** Adelaide Metro Transport Analysis  
 **Client:** Centre for Automotive Safety Research (CASR)  
-**Prepared by:** Chenchen Zhang  
-**Updated:** 6 November 2026  
-**Status:** Historical demo setup verified; final frontend acceptance pending.
+**Team:** UG-S2-15  
+**Last Updated:** 6 November 2026  
+**Status:** Final integration testing in progress
 
-## Purpose
+## 1. Project Overview
 
-This document provides instructions for installing, configuring, running
-and verifying the Adelaide Metro Transport Analysis application.
+This project provides a web-based platform for exploring Adelaide Metro transport data.
 
-It is intended to support the final project handover to CASR and future
-development by the client.
+The system integrates a Flask backend, SQLite historical data, and a Leaflet-based interactive map.
 
-The system consists of GTFS data collection and processing, historical
-SQLite storage, delay analysis, Flask APIs and a Leaflet-based web interface.
+The main features include:
 
-The instructions distinguish between the recorded three-route historical
-demo and the wider static Adelaide Metro network.
+- City-wide bus routes and stops
+- Route and stop performance statistics
+- Historical delay hotspots
+- Network-wide predicted delay visualisation
+- Historical vehicle playback
+- Nearest-stop search
 
-The final release status will be updated after the frontend integration
-and client acceptance testing have been completed.
+The website is intended to support CASR researchers in exploring historical public transport performance and identifying potential delay patterns.
 
-## Historical Demo Data
+The application is a historical analysis tool, not a live vehicle-tracking service.
 
-The historical demonstration uses recorded Adelaide Metro data from
-26 September 2026, 09:00–11:00 Adelaide time (UTC+09:30).
+## 2. System Requirements
 
-The recorded dataset covers three routes:
+- Python 3.12
+- Git
+- A modern web browser
+- Internet connection for the map baselayer
+- Project source code from GitHub
+- Required historical and static GTFS data files
 
-- G10
-- M44
-- 506
+The verified development environment used Python 3.12.2 on Windows.
 
-This dataset supports reproducible historical analysis and vehicle
-playback demonstrations. It is not a live transport feed.
+## 3. Installation
 
-The project also includes backend support for a wider static Adelaide
-Metro bus network and network-wide historical stop delay analysis.
+Clone the project repository or download the final source code.
 
-These capabilities are separate from the recorded three-route dataset.
-
-Wider static network coverage does not automatically mean that
-historical delay data is available for every route or stop.
-
-
-## Environment Setup
-
-The verified local development environment uses Python 3.12.2.
-
-Python dependencies are installed from the project's
-requirements.txt file. pytest may be installed separately
-when running automated tests.
-
-Open PowerShell in the project root. Create and activate a virtual environment:
+Open PowerShell in the project root:
 
 ```powershell
-python --version
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python -m pip check
 ```
 
-Use this environment when starting the backend. If PowerShell blocks
-activation, use the virtual environment's Python directly:
+The installation must complete without unresolved dependency errors.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+## 4. Required Data
+
+The project uses three main data sources.
+
+| Dataset | Purpose |
+|---|---|
+| GTFS Static 1710 | City-wide routes, stops and route geometry |
+| CASR v2 historical database | Historical trip updates and vehicle positions |
+| Recorded three-route demo | Fallback demonstration and existing playback workflow |
+
+### 4.1 GTFS Static Network
+
+The verified GTFS Static 1710 publication was prepared into a static map catalog.
+
+It contains:
+
+- 384 routes
+- 7,241 stops or locations
+- 1,148 route shapes
+
+The source GTFS archive and prepared static map catalog must be available for reproducing the city-wide network.
+
+### 4.2 CASR v2 Historical Database
+
+The verified historical database is:
+
+`adelaide_metro_history_v2_20261022_140923.db`
+
+It contains approximately 7.54 million trip-update records and 3.69 million vehicle-position records.
+
+The original database passed a read-only SQLite integrity check.
+
+The database should be preserved unchanged and must not be automatically upgraded or committed to GitHub.
+
+### 4.3 Recorded Demo Dataset
+
+The original demonstration dataset contains recorded historical data for routes G10, M44 and 506.
+
+The following files are required for the existing demo environment:
+
+```text
+data/demo/adelaide_metro_demo.db
+data/demo/adelaide_metro_demo.manifest.json
+data/demo_map_data/route-shapes.geojson
+data/demo_map_data/stops.geojson
+data/demo_map_data/trip-map.json
+data/demo_map_data/manifest.json
 ```
 
-Then replace `python` with `.\.venv\Scripts\python.exe` in the backend
-startup command below.
+These files must be obtained through the team's approved data-sharing location if they are not included in the repository.
 
-## Local Files
+Do not replace the recorded demo database with CASR v2 without verifying endpoint compatibility.
 
-Download the Sprint 4 demo files from the team's shared OneDrive folder.
-Sign in with your university Microsoft account if prompted.
+## 5. Running the Application
 
-The shared folder contains:
+The commands below describe the verified local development configurations.
 
-- adelaide_metro_demo.db
-- adelaide_metro_demo.manifest.json
-- Map data/route-shapes.geojson
-- Map data/stops.geojson
-- Map data/trip-map.json
-- Map data/manifest.json
+### 5.1 Original Recorded Demo
 
-After downloading, copy the files into the project folders listed below.
-Move the four files inside `Map data` into `data/demo_map_data`;
-do not add another `Map data` folder inside it.
-
-These files are shared separately and are not included in a GitHub pull.
-OneDrive download was confirmed for the account used by Chenan.
-Other members' access permissions have not been checked.
-
-Copy the shared demo database and its manifest into:
-
-    data/demo/adelaide_metro_demo.db
-    data/demo/adelaide_metro_demo.manifest.json
-
-Copy the four shared map files into:
-
-    data/demo_map_data/route-shapes.geojson
-    data/demo_map_data/stops.geojson
-    data/demo_map_data/trip-map.json
-    data/demo_map_data/manifest.json
-
-Keep these files locally. Do not run the live collector against the demo database.
-
-Before starting the backend, check that all six files exist:
+Open PowerShell in the project root and activate the virtual environment:
 
 ```powershell
-$demoFiles = @(
-    ".\data\demo\adelaide_metro_demo.db"
-    ".\data\demo\adelaide_metro_demo.manifest.json"
-    ".\data\demo_map_data\route-shapes.geojson"
-    ".\data\demo_map_data\stops.geojson"
-    ".\data\demo_map_data\trip-map.json"
-    ".\data\demo_map_data\manifest.json"
-)
-
-$demoFiles | ForEach-Object {
-    [PSCustomObject]@{
-        File = $_
-        Exists = Test-Path -LiteralPath $_ -PathType Leaf
-    }
-}
+.\.venv\Scripts\Activate.ps1
 ```
 
-Every row should show `True`. This checks file presence, not file integrity.
-
-## Start the Backend
-
-Open PowerShell in the project root and run:
-
-    $env:ADELAIDE_METRO_DATABASE_PATH = (Resolve-Path .\data\demo\adelaide_metro_demo.db).Path
-    $env:ADELAIDE_METRO_DEMO_MAP_DATA_PATH = (Resolve-Path .\data\demo_map_data).Path
-    python -m flask --app backend.api.app run --host 127.0.0.1 --port 5000
-
-Keep this terminal running. Set both paths again when starting from a new terminal.
-
-## Start the Frontend
-
-Open another terminal in the project root and run:
-
-    python -m http.server 8000
-
-Open:
-
-    http://127.0.0.1:8000/frontend/
-
-The backend must stay running while using the webpage.
-
-## Backend Checks
-
-The following checks were completed on 16 October:
-
-- Map-data requests returned the expected shapes, stops and trips for all three routes.
-- The G10 vehicle history request returned 741 positions.
-- The recorded-dataset check verified all three routes.
-- Unknown map route returned 404.
-- Missing map files returned 503.
-- The demo database hash was unchanged.
-
-See the test report:
-
-[Map and vehicle history test report](../testing/sprint4-map-history-integration-test-report.md)
-
-These checks do not confirm that the new map and playback features work in the browser.
-
-## Vehicle History Request Example
-
-With the backend running, open another PowerShell terminal and run:
+Configure the recorded demo files:
 
 ```powershell
-$historyUrl = "http://127.0.0.1:5000/api/routes/G10/vehicle-positions?start_time=2026-09-26T09:00:00%2B09:30&end_time=2026-09-26T11:00:00%2B09:30&limit=200&offset=0"
-$history = Invoke-RestMethod -Uri $historyUrl
-$history | ConvertTo-Json -Depth 10
+$env:ADELAIDE_METRO_DATABASE_PATH = (Resolve-Path ".\data\demo\adelaide_metro_demo.db").Path
+$env:ADELAIDE_METRO_DEMO_MAP_DATA_PATH = (Resolve-Path ".\data\demo_map_data").Path
 ```
 
-This requests G10 positions between 09:00 and 11:00 Adelaide time.
-The start time is included and the end time is excluded.
+Start the Flask backend:
 
-The response contains up to 200 positions. If `next_offset` is not null,
-use that value as the next request's `offset`. Continue until
-`next_offset` is null.
+```powershell
+python -m flask --app backend.api.app run --host 127.0.0.1 --port 5001
+```
 
-The earlier complete-dataset check returned 741 G10 positions.
-A single page with `limit=200` is not expected to contain all 741.
+Open another PowerShell terminal in the project root and start the frontend server:
 
-## Scoping Document Risk Review
+```powershell
+python -m http.server 8000
+```
 
-Reviewed on 16 October against Section 3.1 of the signed scoping document.
+Open the original frontend:
 
-The ratings below are from the original document. Owners are proposed
-based on module responsibilities and need team confirmation.
+`http://127.0.0.1:8000/frontend/`
 
-| Original risk | Original likelihood / impact | Current position | Follow-up | Proposed owner |
-| --- | --- | --- | --- | --- |
-| Incomplete or incorrectly processed GTFS data affects analysis. | High / High | Recorded-data checks passed for the three demo routes. The dataset covers a limited recording window. | Document missing-data and matching limitations. Check the final demo files against their manifests. | Chenan and Lixuan |
-| Incorrect punctuality logic produces misleading results. | Medium / High | The regression suite passed. Selected API and frontend results were compared earlier. | Confirm threshold boundary tests and correct the interface wording for observation counts. | Chengxi and Pritish |
-| Modules do not work correctly when integrated. | Medium / High | Backend APIs and the existing browser functions were checked. Route geometry and playback remain incomplete in the frontend. | Finish integration, test the remaining workflows and record fixes. | Module owners and Chenchen |
-| Collection or database failures create gaps in historical records. | Medium / High | The fixed demo database can be queried. This does not confirm continuous collection reliability. | Record known collection gaps, retain a backup and check collection failure handling. | Chenan and Lixuan |
-| API access restrictions interrupt collection. | Medium / High | The recorded demo does not require new Adelaide Metro feed requests. Collector compliance was not checked in this setup verification. | Review polling, retries and back-off against the applicable API requirements. | Chenan |
+The original frontend configuration must point to the corresponding backend port.
 
-These risks remain open for monitoring.
+### 5.2 CASR v2 Historical Analysis Environment
 
-## Current Risks and Follow-up
+The following paths were used during local verification and must be replaced with the actual file locations on another computer.
 
-| Risk or issue | Current position | Next action | Suggested owner |
-| --- | --- | --- | --- |
-| Frontend integration is unfinished | Backend map and vehicle history checks passed; browser integration is still pending | Connect the APIs and test route switching and playback | Pritish, with Chenchen testing |
-| Local files or paths are missing | Map-data requests return 503 when artifacts are unavailable | Check all files and configure both paths before the demo | Chenchen |
-| Map tiles or Leaflet cannot load | Local transport data does not include the basemap or Leaflet files | Check internet access and prepare backup screenshots or a recording | Pritish and Chenchen |
-| Historical data could be mistaken for live data | The dataset contains September observations | Add a visible recorded-data label and date range | Pritish |
-| Performance counts could be misunderstood | "Services analysed" counts retained prediction observations | Agree on the metric wording and update the interface | Chengxi and Pritish |
-| Remaining features are not yet verified | Nearest-stop distance, hotspots and browser playback remain on the test list | Test each feature after it is integrated and record any problems | Feature owners and Chenchen |
+Open PowerShell in the project root:
 
-The owners above are proposed coordination responsibilities, not a record of confirmed assignments.
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-## Before the Demo
+Set the CASR v2 historical database path:
 
-- Start the backend and frontend from fresh terminals.
-- Check that the application uses the correct demo database and map files.
-- Check all three routes in the browser.
-- Test the features included in the agreed demo scope.
-- Check screen-sharing readability and recording.
-- Keep backup screenshots or a recording available.
-- Record unresolved issues rather than marking untested features as passed.
+```powershell
+$env:ADELAIDE_METRO_DATABASE_PATH = "D:\ICT Capstone\adelaide_metro_history_v2_20261022_140923.db"
+```
 
-## Stop the Servers
+Set the prepared GTFS static catalog path:
 
-Press Ctrl+C in the Flask terminal and in the frontend server terminal.
-Both terminals should return to the PowerShell prompt.
+```powershell
+$env:ADELAIDE_METRO_STATIC_MAP_DATA_PATH = "D:\ICT Capstone\static-map-1710"
+```
 
-## Independent Setup Verification
+Set the existing demo map-data path:
 
-Feedback provided by Chenan Wang on 16 October 2026.
+```powershell
+$env:ADELAIDE_METRO_DEMO_MAP_DATA_PATH = (Resolve-Path ".\data\demo_map_data").Path
+```
 
-Tested commit: `24388749bf6d41d0408750f2c9a98b543fbdc615`
+Start the backend:
 
-Result: PASS WITH ISSUES.
+```powershell
+python -m flask --app backend.api.app run --host 127.0.0.1 --port 5002
+```
 
-### What was checked
+The CASR v2 frontend integration was verified using a separate local frontend copy configured with:
 
-Chenan reported that the backend started after installing dependencies,
-and the frontend opened successfully.
+```javascript
+const API_BASE_URL = "http://127.0.0.1:5002";
+```
 
-The browser displayed the basemap and 354 stops. G10, M44 and 506 could
-be selected, route performance values updated, and stop 3771 could be
-selected and displayed. Map-data and vehicle-history API requests also
-worked. No critical browser errors were reported during those checks.
+The test frontend was served using:
 
-OneDrive download was confirmed manually using an authenticated university
-account. All six required files were present locally, and both manifests
-could be opened. SHA-256 checks were not performed on those downloaded copies.
-Other members' OneDrive access has not been verified.
+```powershell
+python -m http.server 8001
+```
 
-### Problems found
+Verified test URL:
 
-The original instructions did not include:
+`http://127.0.0.1:8001/frontend-casr-test/`
 
-- Python version, virtual environment and dependency installation.
-- Clear OneDrive download and local file placement instructions.
-- A complete vehicle-history request.
-- File checks before backend startup.
+**Important:** `frontend-casr-test` was an isolated local testing copy. It is not automatically included in the final repository.
 
-These instructions have now been added. The revised instructions have
-not yet been followed by another member from start to finish.
+For final deployment, configure the repository frontend to use the intended backend address and confirm that the configuration works before handover.
 
-### Remaining limitations
+## 6. Verified Functionality
 
-Route geometry, historical vehicle playback and the recorded-data banner
-were reported as incomplete in the tested frontend.
+Sprint 5 integration testing confirmed the following functions:
 
-The browser also relies on online or cached Leaflet and map-tile resources.
+| Feature | Status |
+|---|---|
+| City-wide static map | PASS |
+| Route and stop selection | PASS |
+| Route and stop performance | PASS |
+| Network-wide historical prediction delays | PASS |
+| Historical delay hotspots | PASS |
+| Nearest stop from map selection | PASS |
+| Route switching | PASS |
+| CASR v2 historical vehicle playback | Pending fix |
 
-The setup result applies to the functions checked above. It does not
-confirm acceptance of all project features or a fresh installation
-using the revised document alone.
+The complete automated regression suite passed 397 tests on 6 November 2026 using an isolated temporary SQLite database.
 
-## Handover Checklist
+These results were recorded before the outstanding historical playback compatibility fix.
 
-- [x] Document local data paths and startup commands.
-- [x] Record backend checks and regression results.
-- [x] Obtain and record independent setup feedback.
-- [x] Add the missing setup instructions identified in that feedback.
-- [x] Review the original scoping risks.
-- [ ] Confirm risk owners and follow-up actions with the team.
-- [ ] Check that the README links to this setup guide.
-- [ ] Check that architecture and data preparation documentation match the demo.
-- [ ] Complete browser acceptance checks after frontend integration.
-- [ ] Prepare backup screenshots or a recording for the demo.
+For details, see:
 
-## Setup Status
+`docs/testing/sprint5-final-integration-test-report.md`
 
-The tested version could be started with additional setup instructions.
-The documentation has been updated to cover the gaps reported by Chenan.
+## 7. Known Limitations and Risks
 
-Backend checks and regression results are recorded in the integration
-test report. Final browser acceptance remains pending for unfinished features.
+### Historical Vehicle Playback
+
+The CASR v2 database contains historical vehicle-position records but has an empty `routes` dimension table.
+
+The current vehicle-history endpoint validates route existence against that table and returns HTTP 404.
+
+A backend compatibility fix and final browser retest are required.
+
+The original recorded demo can be retained as a fallback for historical playback.
+
+### Historical Data Coverage
+
+The static GTFS publication and the CASR v2 historical database do not have identical route and stop coverage.
+
+Not every static route or stop has recorded historical observations.
+
+### Data Interpretation
+
+- Historical predicted delays are not confirmed actual arrival delays.
+- Vehicle-position records are historical, not live tracking.
+- Missing data must not be interpreted as zero delay.
+- Insufficient observations must be distinguished from unavailable data.
+- Large historical queries may exceed backend processing limits.
+
+### Data Sharing
+
+Large database and generated data files should not be committed to GitHub.
+
+The team must confirm the approved dataset-sharing location and access permissions before distributing CASR-provided historical data.
+
+## 8. Automated Testing
+
+From the project root, activate the virtual environment and configure a fresh temporary test database:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+
+$env:ADELAIDE_METRO_DATABASE_PATH = Join-Path $env:TEMP ("adelaide-metro-test-" + [guid]::NewGuid().ToString("N") + ".db")
+
+python -m pytest -q
+```
+
+The pre-fix regression test on 6 November 2026 reported:
+
+**397 passed in 74.89 seconds.**
+
+Tests must be rerun after final code changes are merged.
+
+Do not use the original CASR historical database as the test initialization database.
+
+## 9. Final Handover Checklist
+
+- [x] Verify the recorded demo database integrity.
+- [x] Verify CASR v2 historical database integrity.
+- [x] Verify the city-wide static network.
+- [x] Test historical delay analysis and hotspots.
+- [x] Test main frontend map interactions.
+- [x] Complete pre-fix automated regression testing.
+- [ ] Fix and verify CASR v2 historical vehicle playback.
+- [ ] Rerun regression tests after the final merge.
+- [ ] Confirm final GitHub commit.
+- [ ] Confirm approved access to all required datasets.
+- [ ] Verify final setup instructions on another computer.
+- [ ] Deliver the final source code, setup guide, testing evidence and known limitations.
+
+## 10. Handover Notes
+
+The final deliverables should include:
+
+- GitHub source code
+- Installation and configuration instructions
+- Approved access to the required datasets
+- Updated system and module design documentation
+- Final integration test report and evidence
+- Known limitations and remaining work
+
+The repository and associated datasets should enable CASR to reproduce the verified functions without relying on undocumented local settings.
+
+Final acceptance remains subject to completion of the outstanding compatibility and regression checks.
