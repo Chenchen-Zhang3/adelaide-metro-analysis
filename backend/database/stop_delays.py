@@ -18,6 +18,9 @@ def query_stop_delays(start_epoch, end_epoch, route_id=None):
 
     Identity matches prepare_analysis_records: trip/stop/scheduled arrival.
     Latest means greatest observation instant, then greatest row ID for ties.
+    Average and classification counts use selected visits, not revision rows;
+    only grouped stop statistics leave SQLite. The guard counts the entire
+    time slice before route filtering to bound the actual index work.
     The legacy Python path compares formatted timestamps; using actual instants
     here also orders correctly across an Adelaide daylight-saving fold.
     """

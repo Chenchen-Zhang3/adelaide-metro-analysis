@@ -1,8 +1,19 @@
+"""Read individual GTFS CSV files into dictionaries, preserving string IDs.
+
+These parsers check headers and selected numeric conversions, not complete GTFS
+relationships or geographic validity. ZIP extraction and cross-file validation
+belong to their consumers. utf-8-sig accepts feeds with or without a UTF-8 BOM.
+"""
 from pathlib import Path
 import csv
 
 
 def parse_stops(file_path):
+    """Return stop rows with float coordinates; fail on missing headers/bad numbers.
+
+    Coordinate range/finite checks and parent-station semantics are downstream
+    responsibilities; conversion to float alone does not establish validity.
+    """
     file_path = Path(file_path)
 
     if not file_path.exists():
@@ -45,6 +56,11 @@ def parse_stops(file_path):
 
 
 def parse_routes(file_path):
+    """Return route dictionaries with integer route_type and unmodified IDs.
+
+    Missing files/required headers or non-integer route types fail explicitly.
+    This function does not select agencies or restrict transport modes.
+    """
     file_path = Path(file_path)
 
     if not file_path.exists():
@@ -87,6 +103,10 @@ def parse_routes(file_path):
 
 
 def parse_trips(file_path):
+    """Read route/service/trip links; normalise optional integer fields or None.
+
+    Referenced routes and service calendars are not resolved by this parser.
+    """
     file_path = Path(file_path)
 
     if not file_path.exists():
@@ -142,6 +162,11 @@ def parse_trips(file_path):
     return trips
 
 def parse_stop_times(file_path):
+    """Read timetable rows with integer sequences, retaining GTFS time strings.
+
+    Values such as 25:10:00 remain strings for service-date-aware conversion.
+    Exact-key duplicate rejection happens in build_stop_time_index, not here.
+    """
     file_path = Path(file_path)
 
     if not file_path.exists():

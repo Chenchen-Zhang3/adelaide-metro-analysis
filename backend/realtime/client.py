@@ -31,10 +31,21 @@ class GTFSRealtimeTimeoutError(GTFSRealtimeRequestError):
 
 
 class GTFSRealtimeClient:
+    """Fetch feed bytes independently of Protobuf parsing and persistence.
+
+    One fetch is one HTTP attempt; the collector owns retry/polling decisions.
+    Settings are injectable so tests can verify requests without live feeds.
+    """
     def __init__(self, settings=DEFAULT_COLLECTION_SETTINGS):
         self.settings = settings
 
     def fetch(self, url):
+        """GET bytes using the configured User-Agent and per-request timeout.
+
+        Preserve HTTP status in typed errors for the collector's retry policy.
+        Empty bodies fail here; content type and semantic FeedMessage validity
+        are not checked by this transport layer. No raw response is persisted.
+        """
         logger.debug("Requesting GTFS-Realtime feed: %s", url)
         request = Request(
             url,
