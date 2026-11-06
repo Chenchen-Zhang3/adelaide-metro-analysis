@@ -38,7 +38,9 @@ class GTFSRealtimeCollector:
     The collector coordinates existing components only: the HTTP client obtains
     bytes, the decoder creates a FeedMessage, and the converter creates the
     project's shared records. It retries temporary retrieval failures using the
-    collection settings. Record-validation policy belongs to a later task.
+    collection settings. Validation helpers reject missing entity fields before
+    conversion; invalid entities/stop updates can be skipped independently.
+    This layer returns records and does not write them to SQLite.
     """
 
     def __init__(
@@ -67,7 +69,11 @@ class GTFSRealtimeCollector:
         return False
 
     def _fetch_with_retry(self, feed_name, fetch_feed):
-        """Fetch one feed, waiting between retries for temporary failures."""
+        """Retry connection/timeouts and HTTP 408/429/5xx with a fixed delay.
+
+        max_retry_attempts counts retries after the initial attempt. Permanent
+        HTTP errors propagate immediately; decoding errors are outside this loop.
+        """
         retry_attempt = 0
 
         while True:
@@ -162,7 +168,13 @@ class GTFSRealtimeCollector:
         return records
 
     def collect_once(self):
-        """Fetch, decode and convert one Vehicle Positions and Trip Updates cycle."""
+        """Return database-ready Vehicle Positions and Trip Updates lists.
+
+        Feeds are fetched sequentially, so this is not an atomic upstream
+        snapshot. A failed fetch/decode prevents this method returning a cycle;
+        the persistence-aware scheduler decides whether to continue later.
+        Service Alerts have no historical record contract and are not collected.
+        """
         logger.info("Starting GTFS-Realtime collection cycle")
         vehicle_feed = self._decode_feed(
             "vehicle_positions",

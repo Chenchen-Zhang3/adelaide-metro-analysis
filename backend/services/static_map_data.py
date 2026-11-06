@@ -31,6 +31,7 @@ def rows(path):
 
 
 def indexed(records, key):
+    """Reject blank/duplicate identifiers before constructing cross-file joins."""
     result = {}
     for row in records:
         value = row[key]
@@ -223,6 +224,11 @@ def _verified_json(path, metadata):
 
 
 def load_catalog(directory=None):
+    """Read the separate route/stop catalog only after checking its payload hash.
+
+    Missing or inconsistent artifacts raise MapDataUnavailableError; they do not
+    become an empty historical result. No historical database is queried here.
+    """
     try:
         folder, manifest = _manifest(directory)
         return _verified_json(folder / "catalog.json", manifest["catalog"])
@@ -231,6 +237,11 @@ def load_catalog(directory=None):
 
 
 def load_static_route_map_data(route_id, directory=None):
+    """Return one verified static payload, or None for an unselected route.
+
+    Hash the exact string route ID for the filename rather than treating user
+    input as a path. Preserve all published variants; no observations are added.
+    """
     try:
         folder, manifest = _manifest(directory)
         if route_id not in manifest["route_files"]:
