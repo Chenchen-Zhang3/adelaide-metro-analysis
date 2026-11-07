@@ -880,15 +880,63 @@ function showNearestStop(latitude, longitude) {
 }
 
 // Convert the selected demo date to Adelaide time
+
 function getPlaybackDate(value) {
     if (!value) {
         return null;
     }
 
-    const date = new Date(`${value}:00+09:30`);
+    // Interpret the selected date and time in Australia/Adelaide.
+    const local = new Date(`${value}:00Z`);
+    if (Number.isNaN(local.getTime())) {
+        return null;
+    }
 
-    return Number.isNaN(date.getTime()) ? null : date;
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Australia/Adelaide",
+        timeZoneName: "longOffset"
+    });
+
+    function offsetMinutes(date) {
+        const part = formatter.formatToParts(date)
+            .find(item => item.type === "timeZoneName");
+
+        const match = part?.value.match(
+            /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/
+        );
+
+        if (!match) {
+            return null;
+        }
+
+        const sign = match[1] === "+" ? 1 : -1;
+        return sign * (
+            Number(match[2]) * 60 + Number(match[3] || 0)
+        );
+    }
+
+    let offset = offsetMinutes(local);
+    if (offset === null) {
+        return null;
+    }
+
+    let result = new Date(local.getTime() - offset * 60000);
+
+    // Recheck the offset at the actual instant for daylight saving.
+    const correctedOffset = offsetMinutes(result);
+    if (correctedOffset === null) {
+        return null;
+    }
+
+    if (correctedOffset !== offset) {
+        result = new Date(
+            local.getTime() - correctedOffset * 60000
+        );
+    }
+
+    return Number.isNaN(result.getTime()) ? null : result;
 }
+
 
 // Display Adelaide local time
 function formatPlaybackTime(date) {
