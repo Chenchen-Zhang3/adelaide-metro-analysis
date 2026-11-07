@@ -17,7 +17,7 @@ from backend.services import static_map_data
 from backend.services.stop_delays import query_network_stop_delays
 from backend.database.stop_delays import StopDelayLimitError
 from backend.services.pipeline import query_and_analyse
-from backend.services.vehicle_history import query_vehicle_history
+from backend.services.vehicle_history import query_vehicle_history, query_vehicle_coverage
 from backend.services.recorded_map_data import (
     MAP_DATA_ENV as DEMO_MAP_DATA_ENV,
     MapDataUnavailableError,
@@ -180,6 +180,20 @@ def get_recorded_route_map_data(route_id):
         data = load_route_map_data(route_id)
     if data is None:
         return jsonify({"error": "Route map data not found"}), 404
+    return jsonify(data)
+
+
+@app.get("/api/routes/<route_id>/vehicle-positions/coverage")
+def get_route_vehicle_coverage(route_id):
+    """Suggest a recorded GPS window for the selected route."""
+    if request.args:
+        return jsonify({"error": "Coverage endpoint accepts no query parameters"}), 400
+    try:
+        data = query_vehicle_coverage(route_id)
+    except ValueError as error:
+        return jsonify({"error": str(error)}), 400
+    if data is None:
+        return jsonify({"error": "Route not found"}), 404
     return jsonify(data)
 
 

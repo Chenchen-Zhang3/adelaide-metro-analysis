@@ -311,6 +311,7 @@ async function loadRoutes() {
 
 // Change the selected route
 function chooseRoute(routeId) {
+    ++playbackCoverageRequest;
     clearPlayback();
     clearHotspots();
 
@@ -331,6 +332,7 @@ function chooseRoute(routeId) {
     selectRoute(routeId);
     showRouteOnMap(routeId);
     loadHotspots(routeId);
+    suggestPlaybackWindow(routeId);
 }
 
 routeSelect.addEventListener("change", () => {
@@ -876,6 +878,34 @@ function showNearestStop(latitude, longitude) {
         });
 
         nearestStopMarker.bringToFront();
+    }
+}
+
+// Suggest actual recorded dates; keep manual selection available.
+let playbackCoverageRequest = 0;
+
+async function suggestPlaybackWindow(routeId) {
+    const requestId = ++playbackCoverageRequest;
+    playbackStatus.textContent = "Finding recorded playback dates...";
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/api/routes/${encodeURIComponent(routeId)}/vehicle-positions/coverage`
+        );
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        if (!response.ok) throw new Error(`Playback coverage unavailable (${response.status}).`);
+        const coverage = await response.json();
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        if (!coverage.has_observations) {
+            playbackStatus.textContent = "No recorded GPS positions for this route. Choose another route.";
+            return;
+        }
+        // Server provides Australia/Adelaide local time including the correct DST offset.
+        playbackStart.value = coverage.start_time.slice(0, 16);
+        playbackEnd.value = coverage.end_time.slice(0, 16);
+        playbackStatus.textContent = "Recorded dates selected. Click Load Vehicle History.";
+    } catch (error) {
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        playbackStatus.textContent = `${error.message} Enter dates manually to continue.`;
     }
 }
 

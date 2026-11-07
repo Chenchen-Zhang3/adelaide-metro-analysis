@@ -1,6 +1,7 @@
 """Small paginated historical-vehicle contract; no collection or writes."""
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from backend.database.connection import get_connection
 from backend.services import static_map_data
@@ -60,3 +61,27 @@ def query_vehicle_history(route_id, start_time=None, end_time=None,
             "end_exclusive": end.isoformat(), "limit": limit, "offset": offset,
             "next_offset": offset + limit if more else None,
             "positions": [dict(row) for row in rows[:limit]]}
+
+
+def query_vehicle_coverage(route_id):
+    """Suggest a recent 15-minute window containing recorded GPS positions."""
+    with closing(get_connection()) as connection:
+        if not _known_route(connection, route_id):
+            return None
+        row = connection.execute(
+            "SELECT timestamp FROM vehicle_positions WHERE route_id = ? "
+            "ORDER BY julianday(timestamp) DESC, id DESC LIMIT 1",
+            (route_id,),
+        ).fetchone()
+    if row is None:
+        return {"route_id": route_id, "has_observations": False,
+                "start_time": None, "end_time": None}
+    latest = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00"))
+    if latest.utcoffset() is None:
+        raise ValueError("Recorded timestamp has no UTC offset")
+    end = latest.astimezone(timezone.utc) + timedelta(seconds=1)
+    start = end - timedelta(minutes=15)
+    adelaide = ZoneInfo("Australia/Adelaide")
+    return {"route_id": route_id, "has_observations": True,
+            "start_time": start.astimezone(adelaide).isoformat(),
+            "end_time": end.astimezone(adelaide).isoformat()}
