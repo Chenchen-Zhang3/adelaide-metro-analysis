@@ -25,6 +25,8 @@ TRIP_UPDATES_PATH = (
 
 class TestAnalysisIntegration(unittest.TestCase):
 
+    # Load the same GTFS trip-update fixtures across integration tests
+    # so delay calculations can be checked against reproducible data.
     def load_trip_updates(self):
         with open(
             TRIP_UPDATES_PATH,
@@ -46,6 +48,9 @@ class TestAnalysisIntegration(unittest.TestCase):
             [6.0, 2.0]
         )
 
+    # Verify that shared GTFS records produce the expected average delay,
+    # delayed rate, on-time rate, early-arrival rate and severe-delay rate.
+    # This checks consistency between fixture data and analysis functions.
     def test_delay_metrics_from_shared_data(self):
         records = self.load_trip_updates()
 
@@ -84,6 +89,8 @@ class TestAnalysisIntegration(unittest.TestCase):
             0.0
         )
 
+    # Check whether known trip delays are classified into the expected
+    # punctuality categories using the current analysis rules.
     def test_punctuality_classification(self):
         records = self.load_trip_updates()
 

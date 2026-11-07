@@ -19,6 +19,8 @@ from backend.analysis.punctuality import classify_punctuality
 
 class TestDatabaseAnalysisIntegration(unittest.TestCase):
 
+    # Create an isolated SQLite database for each integration test.
+    # Patch the database path to avoid modifying real or demo data.
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
 
@@ -34,12 +36,19 @@ class TestDatabaseAnalysisIntegration(unittest.TestCase):
 
         self.database_patch.start()
 
+
         create_tables()
 
+    # Restore the original database configuration and remove temporary
+    # files after each test to prevent interference between test runs.
     def tearDown(self):
         self.database_patch.stop()
         self.temp_dir.cleanup()
 
+
+    # Verify the complete database-to-analysis workflow:
+    # insert controlled trip updates, retrieve them by route,
+    # convert delays into minutes and validate the resulting metrics.
     def test_database_records_can_be_used_by_analysis(self):
 
         first_update = {

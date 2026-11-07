@@ -68,6 +68,11 @@ def unix_timestamp_to_iso(timestamp):
 
 
 def gtfs_time_to_datetime(service_date, gtfs_time):
+    """Attach an HH:MM:SS timetable value to its Adelaide service date.
+
+    Hours above 23 deliberately advance into the following calendar day.
+    This conversion does not decide whether the service runs on that date.
+    """
     try:
         hours, minutes, seconds = map(int, gtfs_time.split(":"))
     except (AttributeError, ValueError) as error:
@@ -89,7 +94,12 @@ def gtfs_time_to_datetime(service_date, gtfs_time):
 
 
 def build_stop_time_index(stop_times):
-    """Index exact static visits, rejecting duplicate normalised identities."""
+    """Map (string trip_id, string stop_id, integer sequence) to timetable rows.
+
+    Reject duplicate normalised keys instead of silently overwriting a visit.
+    Repeated stops at different sequences remain distinct; sequences need not
+    be consecutive and must not be inferred from array positions.
+    """
     index = {}
 
     for stop_time in stop_times:
@@ -124,6 +134,11 @@ def calculate_delay_seconds(scheduled_datetime, actual_datetime):
 
 
 def convert_vehicle_position(entity):
+    """Extract a vehicle observation, preserving absent trip/route/time as None.
+
+    Required vehicle identity/position failures raise ValueError. This converter
+    does not independently establish coordinate bounds or trajectory continuity.
+    """
     if not entity.HasField("vehicle"):
         raise ValueError("Entity does not contain a vehicle position")
 
@@ -157,6 +172,14 @@ def convert_vehicle_position(entity):
 
 
 def convert_trip_update(entity, stop_time_index):
+    """Match predicted arrivals to exact static visits and derive signed delay.
+
+    Missing trip identity/service date raises ValueError; unusable stop updates
+    and unmatched tuples are skipped. No sequence offset or trip/stop fallback
+    is applied. The legacy actual_arrival field contains a feed prediction,
+    not an independently verified arrival event. Service calendars and feed
+    version compatibility must be established outside this converter.
+    """
     if not entity.HasField("trip_update"):
         raise ValueError("Entity does not contain a trip update")
 
