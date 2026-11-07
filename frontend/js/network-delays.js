@@ -41,11 +41,26 @@
         if (delay <= 10) return "medium";
         return "high";
     }
+    // These labels classify the mean of historical predictions, not actual arrivals.
+    function predictionLabel(entry) {
+        const kind = category(entry);
+        return {
+            early: "Early", low: "On Time", medium: "Delayed",
+            high: "Severely Delayed", insufficient: "Insufficient data",
+            missing: "No data"
+        }[kind];
+    }
+    function signedMinutes(value) {
+        if (!finite(value)) return "N/A";
+        const minutes = Number(value);
+        return `${minutes > 0 ? "+" : ""}${minutes.toFixed(2)} min`;
+    }
     function popup(stop, entry) {
         const availability = entry ? (entry.data_status === "available" ? "Available" : "Insufficient data") : "No data";
         const count = entry && Number.isFinite(Number(entry.prediction_sample_count)) ? String(entry.prediction_sample_count) : "0";
         return `<strong>${safe(stop.stop_name || "Stop")}</strong><br>Stop ID: ${safe(stop.stop_id)}<br>Data: ${availability}` +
-            `<br>Average predicted delay: ${entry?.data_status === "available" ? format(entry.average_predicted_delay_minutes, " min") : "N/A"}` +
+            `<br>Average prediction category: <strong>${predictionLabel(entry)}</strong>` +
+            `<br>Average predicted delay: ${entry?.data_status === "available" ? signedMinutes(entry.average_predicted_delay_minutes) : "N/A"}` +
             `<br>Predicted on-time: ${entry?.data_status === "available" ? format(entry.predicted_on_time_percentage, "%") : "N/A"}` +
             `<br>Prediction visit samples: ${safe(count)}` +
             `<br>First selected observation: ${safe(entry?.first_selected_observation_time || "N/A")}` +
@@ -92,6 +107,10 @@
     });
 
     function setMode(active) {
+        if (!active) {
+            state.request++;
+            state.controller?.abort();
+        }
         state.active = active;
         if (state.layer) {
             if (active && state.loaded) state.layer.addTo(map);
@@ -163,6 +182,9 @@
                 : "Showing the selected delay or coverage category.";
     }
     function resetOnFailure(message) {
+        // Invalidate any in-flight response before clearing the displayed result.
+        state.request++;
+        state.controller?.abort();
         state.loaded = false;
         state.results.clear();
         state.coverage = null;
@@ -189,7 +211,7 @@
             const start = adelaideInstant($("networkDelayStart").value);
             const end = adelaideInstant($("networkDelayEnd").value);
             const duration = end - start;
-            if (duration < 0 || duration > 3600000) throw new Error("Select a time window between 0 and 60 minutes.");
+            if (duration <= 0 || duration > 3600000) throw new Error("Select a time window greater than 0 and at most 60 minutes.");
             const params = new URLSearchParams({ start_time: start.toISOString(), end_time: end.toISOString(), scope: "static", min_samples: $("networkDelayMinSamples").value });
             if ($("networkDelayRouteOnly").checked && routeSelect.value) params.set("route_id", routeSelect.value);
             const response = await fetch(`${API_BASE_URL}/api/analysis/stop-delays?${params}`, { signal: state.controller.signal });
@@ -229,16 +251,16 @@
           <button id="networkDelayLoad" type="button">Load prediction delays</button>
           <label for="networkDelayFilter">Show markers</label><select id="networkDelayFilter"><option value="available" selected>Available delays (recommended)</option><option value="all">All eligible stops (coverage)</option><option value="early">Early average (&lt;0 min)</option><option value="low">0–5 min</option><option value="medium">&gt;5–10 min</option><option value="high">&gt;10 min</option><option value="insufficient">Insufficient data</option><option value="missing">No data</option></select>
           <div class="network-delay-legend"><strong>Average predicted delay (minutes)</strong>
-          <span><i style="background:${COLORS.early}"></i> Early (&lt;0)</span><span><i style="background:${COLORS.low}"></i> 0–5</span><span><i style="background:${COLORS.medium}"></i> &gt;5–10</span><span><i style="background:${COLORS.high}"></i> &gt;10</span><span><i style="background:${COLORS.insufficient}"></i> Insufficient</span><span><i style="background:${COLORS.missing}"></i> No data</span></div>
+          <span><i style="background:${COLORS.early}"></i> Early (&lt;0)</span><span><i style="background:${COLORS.low}"></i> On Time (0–5)</span><span><i style="background:${COLORS.medium}"></i> Delayed (&gt;5–10)</span><span><i style="background:${COLORS.high}"></i> Severely Delayed (&gt;10)</span><span><i style="background:${COLORS.insufficient}"></i> Insufficient</span><span><i style="background:${COLORS.missing}"></i> No data</span></div>
           <p id="networkDelaySummary">No delay data loaded</p><p id="networkDelayViewNote" class="network-delay-view-note">Only calculated delays are shown by default to avoid overcrowding.</p><p id="networkDelayStatus" role="status">Choose a window and load data.</p>
-          <p class="hotspot-note">Colours are display bins, not validated reliability thresholds. Predictions are not actual arrivals. N/A does not mean zero delay. Requires the approved October v2 database and complete static GTFS publication.</p></div>`;
+          <p class="hotspot-note">Categories describe average predicted delays, not individual service punctuality or validated reliability. Predictions are not actual arrivals. N/A does not mean zero delay. Requires the approved October v2 database and complete static GTFS publication.</p></div>`;
         document.querySelector(".sidebar").appendChild(section);
         const styles = document.createElement("style");
         styles.textContent = `.network-delay-card{display:flex;flex-direction:column;gap:10px}.network-delay-card[hidden]{display:none}.network-delay-card label{font-size:12px;font-weight:600}.network-delay-card input[type=datetime-local]{width:100%;padding:9px;border:1px solid #d0d5dd;border-radius:7px}.network-delay-card button{padding:11px;border:0;border-radius:8px;background:#1d2939;color:white;font-weight:600;cursor:pointer}.network-delay-toggle{display:flex;align-items:center;gap:8px;font-size:13px}.network-delay-legend{display:grid;gap:6px;font-size:12px}.network-delay-legend span{display:flex;align-items:center;gap:8px}.network-delay-legend i{width:12px;height:12px;border-radius:50%;display:inline-block;border:1px solid #64748b}#networkDelayStatus,#networkDelaySummary{font-size:12px;line-height:1.5;overflow-wrap:anywhere}`;
         document.head.appendChild(styles);
         const picker = $("networkDelayRoutePicker");
         function syncPicker() {
-            const current = picker.value || routeSelect.value;
+            const current = routeSelect.value || picker.value;
             picker.innerHTML = routeSelect.innerHTML;
             picker.value = [...picker.options].some(option => option.value === current) ? current : "";
         }
@@ -265,6 +287,12 @@
         });
         $("networkDelayToggle").addEventListener("change", event => setMode(event.target.checked));
         $("networkDelayLoad").addEventListener("click", load);
+        // A changed query must never leave the previous window's colours visible.
+        for (const id of ["networkDelayStart", "networkDelayEnd", "networkDelayMinSamples"]) {
+            $(id).addEventListener("change", () => {
+                if (state.active) resetOnFailure("Analysis settings changed. Load prediction delays again.");
+            });
+        }
         $("networkDelayFilter").addEventListener("change", () => { if (state.loaded) draw(); });
         $("networkDelayRouteOnly").addEventListener("change", () => {
             if (state.loaded) resetOnFailure("Route filter changed. Reload predictions to apply it.");

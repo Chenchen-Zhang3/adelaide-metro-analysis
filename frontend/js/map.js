@@ -44,6 +44,7 @@ const stopMarkers = new Map();
 let selectedLocation = null;
 let selectedLocationMarker = null;
 let nearestStopMarker = null;
+let nearestMetricsRequest = 0;
 let selectedStopId = null;
 
 let routeGeometryLayer = null;
@@ -311,6 +312,7 @@ async function loadRoutes() {
 
 // Change the selected route
 function chooseRoute(routeId) {
+    ++playbackCoverageRequest;
     clearPlayback();
     clearHotspots();
 
@@ -331,6 +333,7 @@ function chooseRoute(routeId) {
     selectRoute(routeId);
     showRouteOnMap(routeId);
     loadHotspots(routeId);
+    suggestPlaybackWindow(routeId);
 }
 
 routeSelect.addEventListener("change", () => {
@@ -731,7 +734,7 @@ function calculateStraightLineDistance(lat1, lon1, lat2, lon2) {
     );
 }
 
-// Find the closest stop
+// Find the closest loaded stop using Haversine distance; this is not walking distance.
 function findNearestStop(latitude, longitude) {
     let nearest = null;
     let shortestDistance = Infinity;
@@ -755,7 +758,7 @@ function findNearestStop(latitude, longitude) {
         : null;
 }
 
-// Show the selected location
+// Keep map clicks and browser geolocation on one nearest-stop display path.
 function setSelectedLocation(latitude, longitude, source) {
     const lat = Number(latitude);
     const lon = Number(longitude);
@@ -802,8 +805,9 @@ function setSelectedLocation(latitude, longitude, source) {
     showNearestStop(lat, lon);
 }
 
-// Highlight the nearest stop
+// Invalidate pending metric responses when the nearest-stop selection changes.
 function showNearestStop(latitude, longitude) {
+    ++nearestMetricsRequest;
     if (nearestStopMarker) {
         nearestStopMarker.setStyle({
             color: "#3388ff",
@@ -863,7 +867,20 @@ function showNearestStop(latitude, longitude) {
         <p class="detail-message">
             This is straight-line distance, not walking distance.
         </p>
+        <div class="detail-heading">Service frequency and historical reliability</div>
+        <p class="detail-message">Choose an Adelaide-local analysis window (maximum 24 hours). Historical reliability describes prediction observations, not actual arrivals.</p>
+        <label for="nearestMetricsStart">Start (Adelaide)</label>
+        <input id="nearestMetricsStart" type="datetime-local" style="width:100%">
+        <label for="nearestMetricsEnd">End (Adelaide)</label>
+        <input id="nearestMetricsEnd" type="datetime-local" style="width:100%">
+        <button type="button" id="nearestMetricsLoad">Load stop service metrics</button>
+        <p id="nearestMetricsStatus" role="status">Select a historical window to load metrics.</p>
+        <div id="nearestMetricsResults"></div>
     `;
+
+    // Keep the requested stop tied to this nearest-stop result, not the route selector.
+    element("nearestMetricsLoad").addEventListener("click", () => loadNearestMetrics(String(stop.stop_id)));
+
 
     nearestStopMarker = stopMarkers.get(String(stop.stop_id)) || null;
 
@@ -879,16 +896,159 @@ function showNearestStop(latitude, longitude) {
     }
 }
 
+// PR04: Request timetable frequency and historical prediction observations separately.
+// Neither predicted on-time percentage nor scheduled frequency proves actual arrivals.
+async function loadNearestMetrics(stopId) {
+    const requestId = ++nearestMetricsRequest;
+    const status = element("nearestMetricsStatus");
+    const output = element("nearestMetricsResults");
+    const start = element("nearestMetricsStart")?.value;
+    const end = element("nearestMetricsEnd")?.value;
+    if (!start || !end || start >= end) {
+        status.textContent = "Choose a valid start and end time.";
+        return;
+    }
+    status.textContent = "Loading stop-level metrics...";
+    output.textContent = "";
+    // Resolve Adelaide local clock times, including the correct daylight-saving offset.
+    // datetime-local does not carry an offset; use Intl to find the matching instant.
+    function adelaideIso(value) {
+        const local = new Date(`${value}:00Z`);
+        if (Number.isNaN(local.getTime())) throw new Error("Invalid analysis time");
+        const wanted = value.replace("T", " ");
+        const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Australia/Adelaide", year: "numeric", month: "2-digit",
+            day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+        });
+        for (let offset = -14 * 60; offset <= 14 * 60; offset += 30) {
+            const instant = new Date(local.getTime() - offset * 60000);
+            const fields = Object.fromEntries(formatter.formatToParts(instant).map(part => [part.type, part.value]));
+            if (`${fields.year}-${fields.month}-${fields.day} ${fields.hour}:${fields.minute}` === wanted) {
+                const sign = offset >= 0 ? "+" : "-";
+                const abs = Math.abs(offset);
+                return `${value}:00${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+            }
+        }
+        throw new Error("The selected Adelaide time is invalid (possibly a daylight-saving transition).");
+    }
+    try {
+        const params = new URLSearchParams({start_time: adelaideIso(start), end_time: adelaideIso(end)});
+        const response = await fetch(`${API_BASE_URL}/api/stops/${encodeURIComponent(stopId)}/service-metrics?${params}`);
+        const data = await response.json();
+        if (requestId !== nearestMetricsRequest) return;
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        const frequency = data.scheduled_frequency;
+        const reliability = data.historical_prediction_reliability;
+        const frequencyText = frequency.status === "available"
+            ? `${frequency.scheduled_trips_per_hour} scheduled trips/hour (${frequency.scheduled_departures} departures)`
+            : `Unavailable — ${frequency.reason || frequency.status}`;
+        const reliabilityStatusLabels = {
+            insufficient_data: "Insufficient historical data",
+            unavailable: "Historical data unavailable",
+            no_data: "No historical data"
+        };
+        const reliabilityText = reliability.status === "available"
+            ? `${reliability.predicted_on_time_percent}% predicted on-time`
+            : `Unavailable — ${reliability.reason || reliabilityStatusLabels[reliability.status] || "Historical data unavailable"}`;
+        output.innerHTML = `
+            <div class="coordinate-row"><span class="coordinate-label">Scheduled frequency</span><span class="coordinate-value">${escapeHtml(frequencyText)}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Historical prediction reliability</span><span class="coordinate-value">${escapeHtml(reliabilityText)}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Valid prediction observations</span><span class="coordinate-value">${escapeHtml(reliability.observation_count ?? "N/A")}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Unique observed trips</span><span class="coordinate-value">${escapeHtml(reliability.unique_observed_trips ?? "N/A")}</span></div>
+            <p class="detail-message">Period: ${escapeHtml(start)} to ${escapeHtml(end)} (Adelaide). Prediction observations are not completed-trip punctuality. Minimum ${escapeHtml(reliability.min_samples ?? 10)} valid observations required.</p>`;
+        status.textContent = "Stop-level metrics loaded.";
+    } catch (error) {
+        if (requestId !== nearestMetricsRequest) return;
+        status.textContent = `Metrics unavailable: ${error.message}`;
+    }
+}
+
+// Suggest actual recorded dates; keep manual selection available.
+let playbackCoverageRequest = 0;
+
+async function suggestPlaybackWindow(routeId) {
+    const requestId = ++playbackCoverageRequest;
+    playbackStatus.textContent = "Finding recorded playback dates...";
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/api/routes/${encodeURIComponent(routeId)}/vehicle-positions/coverage`
+        );
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        if (!response.ok) throw new Error(`Playback coverage unavailable (${response.status}).`);
+        const coverage = await response.json();
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        if (!coverage.has_observations) {
+            playbackStatus.textContent = "No recorded GPS positions for this route. Choose another route.";
+            return;
+        }
+        // Server provides Australia/Adelaide local time including the correct DST offset.
+        playbackStart.value = coverage.start_time.slice(0, 16);
+        playbackEnd.value = coverage.end_time.slice(0, 16);
+        playbackStatus.textContent = "Recorded dates selected. Click Load Vehicle History.";
+    } catch (error) {
+        if (requestId !== playbackCoverageRequest || routeSelect.value !== routeId) return;
+        playbackStatus.textContent = `${error.message} Enter dates manually to continue.`;
+    }
+}
+
 // Convert the selected demo date to Adelaide time
+
 function getPlaybackDate(value) {
     if (!value) {
         return null;
     }
 
-    const date = new Date(`${value}:00+09:30`);
+    // Interpret the selected date and time in Australia/Adelaide.
+    const local = new Date(`${value}:00Z`);
+    if (Number.isNaN(local.getTime())) {
+        return null;
+    }
 
-    return Number.isNaN(date.getTime()) ? null : date;
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Australia/Adelaide",
+        timeZoneName: "longOffset"
+    });
+
+    function offsetMinutes(date) {
+        const part = formatter.formatToParts(date)
+            .find(item => item.type === "timeZoneName");
+
+        const match = part?.value.match(
+            /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/
+        );
+
+        if (!match) {
+            return null;
+        }
+
+        const sign = match[1] === "+" ? 1 : -1;
+        return sign * (
+            Number(match[2]) * 60 + Number(match[3] || 0)
+        );
+    }
+
+    let offset = offsetMinutes(local);
+    if (offset === null) {
+        return null;
+    }
+
+    let result = new Date(local.getTime() - offset * 60000);
+
+    // Recheck the offset at the actual instant for daylight saving.
+    const correctedOffset = offsetMinutes(result);
+    if (correctedOffset === null) {
+        return null;
+    }
+
+    if (correctedOffset !== offset) {
+        result = new Date(
+            local.getTime() - correctedOffset * 60000
+        );
+    }
+
+    return Number.isNaN(result.getTime()) ? null : result;
 }
+
 
 // Display Adelaide local time
 function formatPlaybackTime(date) {
@@ -938,7 +1098,8 @@ function clearPlayback() {
         "Select a route and load its recorded vehicle history.";
 }
 
-// Load recorded GPS observations
+// PR03: Page through recorded vehicle GPS observations for the selected route/window.
+// Request IDs prevent a previous route response from overwriting the new selection.
 async function loadVehicleHistory() {
     const routeId = routeSelect.value;
 
@@ -1263,7 +1424,8 @@ function clearHotspots() {
     hotspotStatus.textContent = "Select a route to view hotspots.";
 }
 
-// Load ranked delay hotspots from the backend
+// PR03: Fetch historical route hotspots with a minimum-service evidence threshold.
+// A stale request must not repaint the map after the selected route changes.
 async function loadHotspots(routeId) {
     const requestId = ++hotspotRequest;
 
@@ -1318,7 +1480,7 @@ async function loadHotspots(routeId) {
     }
 }
 
-// Display hotspot markers and the ranked list
+// Render the same backend-ranked hotspot data as map markers and a text list.
 function renderHotspots() {
     if (hotspotLayer) {
         map.removeLayer(hotspotLayer);
