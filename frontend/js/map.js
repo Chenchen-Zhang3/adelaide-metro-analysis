@@ -734,7 +734,7 @@ function calculateStraightLineDistance(lat1, lon1, lat2, lon2) {
     );
 }
 
-// Find the closest stop
+// Find the closest loaded stop using Haversine distance; this is not walking distance.
 function findNearestStop(latitude, longitude) {
     let nearest = null;
     let shortestDistance = Infinity;
@@ -758,7 +758,7 @@ function findNearestStop(latitude, longitude) {
         : null;
 }
 
-// Show the selected location
+// Keep map clicks and browser geolocation on one nearest-stop display path.
 function setSelectedLocation(latitude, longitude, source) {
     const lat = Number(latitude);
     const lon = Number(longitude);
@@ -805,7 +805,7 @@ function setSelectedLocation(latitude, longitude, source) {
     showNearestStop(lat, lon);
 }
 
-// Highlight the nearest stop
+// Invalidate pending metric responses when the nearest-stop selection changes.
 function showNearestStop(latitude, longitude) {
     ++nearestMetricsRequest;
     if (nearestStopMarker) {
@@ -896,7 +896,8 @@ function showNearestStop(latitude, longitude) {
     }
 }
 
-// Show stop-level scheduled frequency separately from prediction-observation reliability.
+// PR04: Request timetable frequency and historical prediction observations separately.
+// Neither predicted on-time percentage nor scheduled frequency proves actual arrivals.
 async function loadNearestMetrics(stopId) {
     const requestId = ++nearestMetricsRequest;
     const status = element("nearestMetricsStatus");
@@ -1097,7 +1098,8 @@ function clearPlayback() {
         "Select a route and load its recorded vehicle history.";
 }
 
-// Load recorded GPS observations
+// PR03: Page through recorded vehicle GPS observations for the selected route/window.
+// Request IDs prevent a previous route response from overwriting the new selection.
 async function loadVehicleHistory() {
     const routeId = routeSelect.value;
 
@@ -1422,7 +1424,8 @@ function clearHotspots() {
     hotspotStatus.textContent = "Select a route to view hotspots.";
 }
 
-// Load ranked delay hotspots from the backend
+// PR03: Fetch historical route hotspots with a minimum-service evidence threshold.
+// A stale request must not repaint the map after the selected route changes.
 async function loadHotspots(routeId) {
     const requestId = ++hotspotRequest;
 
@@ -1477,7 +1480,7 @@ async function loadHotspots(routeId) {
     }
 }
 
-// Display hotspot markers and the ranked list
+// Render the same backend-ranked hotspot data as map markers and a text list.
 function renderHotspots() {
     if (hotspotLayer) {
         map.removeLayer(hotspotLayer);
