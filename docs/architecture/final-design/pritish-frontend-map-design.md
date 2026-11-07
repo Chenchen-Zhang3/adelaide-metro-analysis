@@ -50,6 +50,21 @@ Leaflet, OpenStreetMap tiles, Flask backend, official Adelaide Metro GTFS v1710 
 - An integration test collection failure involving pytest parameter IDs was addressed by assigning explicit IDs to the invalid-protobuf and HTTP-403 test cases.
 - A full backend suite was run with local dataset override environment variables unset, preventing the published static catalogue from replacing test fixtures.
 
+## Final browser acceptance testing — 7 November 2026
+
+The developer manually tested the frontend in Safari Private Window against a locally running Flask API and static frontend server. The following are **developer-reported pass results**; screenshots have now been provided and are catalogued in the linked browser evidence report. The exact route IDs, stop IDs, time windows and Safari version were not recorded.
+
+| Test | Result | Observed behaviour |
+| --- | --- | --- |
+| 1. Citywide map | Pass (reported) | Map loads; stop markers appear; pan/zoom, stop selection and responsiveness work. |
+| 2. Route selection | Pass (reported) | Route dropdown and static geometry display; selecting another route updates geometry without leftover lines. |
+| 3. Nearest stop and metrics | Pass (reported) | Map clicks and browser geolocation identify nearest stop; straight-line distance, scheduled frequency and prediction reliability or appropriate data-status messages appear; changing location refreshes results. |
+| 4. Historical hotspots | Pass (reported) | Hotspot markers and ranked list display; switching routes replaces/clears previous results without stale markers. |
+| 5. Historical vehicle playback | Pass (reported) | Recorded vehicle positions load; Play, Pause and timeline seeking work; route/window changes replace old playback; no visible errors reported. |
+
+**Screenshot evidence:** Six screenshots captured on 7 November 2026 are included in [Frontend Browser Testing Evidence](pritish-frontend-browser-testing-evidence.md), with image paths, observed outcomes and limitations. The selected-stop image does not show the nearest-stop service-metrics panel; that portion remains supported by the developer's manual test report only. The prediction-delay overlay image contains a potential selected-window/observation-timestamp mismatch that needs investigation.
+**Scope of verification:** These five tests cover the listed interactive workflows. A separate final browser check of the network-wide historical prediction-delay overlay, ambiguous Adelaide daylight-saving inputs, empty/error states and performance under varied datasets remains outstanding. The absence of visible errors is not equivalent to an inspected browser console or network trace.
+
 ## Code review and verification record
 
 - `frontend/js/map.js` has targeted comments at nearest-stop selection, scheduled-versus-observed metrics, playback pagination, request invalidation and hotspot rendering. `frontend/js/network-delays.js` already contains comments for timezone handling, prediction-only categories, marker eligibility and overlay management.
@@ -57,7 +72,7 @@ Leaflet, OpenStreetMap tiles, Flask backend, official Adelaide Metro GTFS v1710 
 - The developer reported the PR04 commit **`918cc04`** pushed to `feature/S5-network-delay-frontend`.
 - Earlier PR04-specific testing reported **4 passed** for `backend/tests/test_nearest_stop_metrics.py`.
 - Historical prediction API integration evidence from 17 October 2026 is recorded above; this is API evidence, **not** a screenshot or proof of final browser acceptance.
-- **Final browser testing evidence still required:** capture screenshots and outcomes for citywide map loading, route and stop selection, nearest-stop with metrics, network prediction categories, hotspots, playback controls and empty/error states. Record browser/version, date, route/stop IDs, historical time windows, and any console/network errors. Do not mark this complete until performed.
+- **Final browser testing:** Five core workflows were manually reported as passing on 7 November 2026 (see acceptance table above). Six screenshots are attached in the linked browser evidence report. Prediction-delay timestamp filtering, nearest-stop metrics screenshot coverage and empty/error states still need targeted verification.
 - **JavaScript syntax and whitespace checks:** run `node --check frontend/js/map.js`, `node --check frontend/js/network-delays.js`, and `git diff --check` after applying the comment changes; the uploaded archive alone does not prove these final checks were executed.
 
 ## Remaining limitations and follow-up
@@ -66,4 +81,4 @@ Leaflet, OpenStreetMap tiles, Flask backend, official Adelaide Metro GTFS v1710 
 - Predictions, scheduled frequencies and observed GPS positions answer different questions; none alone establishes actual stop arrival punctuality.
 - Nearest-stop distance is straight-line distance and may differ substantially from a pedestrian route.
 - Playback depends on recorded position coverage, may have gaps, and must not be presented as live tracking.
-- Browser performance with all Adelaide-wide markers, map tile availability, browser geolocation permission and final acceptance screenshots remain to be verified on the development machine.
+- The developer reported the citywide map responsive and browser geolocation working in Safari. Detailed performance measurements and repeatability on other devices remain outstanding. Screenshots of six UI states are included in the linked browser evidence report.
