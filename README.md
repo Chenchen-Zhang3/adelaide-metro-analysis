@@ -1,344 +1,106 @@
-# Adelaide Metro Real-Time Transport Analysis
 
-This repository contains the prototype developed for the Adelaide Metro Real-Time Transport Analysis capstone project.
+Adelaide Metro Transport Analysis
+Client: Centre for Automotive Safety Research (CASR)
+Team: UG-S2-15
+Final presentation: 9 November 2026
+Last updated: 7 November 2026
 
-The project is being developed for CASR researchers to support the collection, storage, exploration and analysis of Adelaide Metro GTFS and GTFS-Realtime data.
+Adelaide Metro Transport Analysis is a research-oriented web application for exploring Adelaide Metro's static network and recorded historical transport information. It combines a Leaflet map, a Python/Flask JSON API, a prepared GTFS Static catalog, and an SQLite historical database. It is not a live vehicle-tracking or actual-arrival verification service.
 
-## CASR technical guide — Sprint 5
+Features
+City-wide routes and stops, with route selection and stop details.
+Route and stop performance statistics based on historical predictions.
+Network-wide predicted-delay visualisation, including missing/insufficient-data states.
+Historical delay hotspot rankings and map markers.
+Historical vehicle-position playback with Adelaide time handling.
+Nearest-stop search from a map-selected location (straight-line distance).
+Quick start — final historical analysis website (Windows)
+These commands describe the locally verified CASR v2 workflow. The historical database and generated static catalog are not included in GitHub. Obtain them through the approved CASR/team sharing location (the team's OneDrive Final presentation folder, if you are authorised to access it).
 
-Start with the [CASR GTFS collection and data-access guide](docs/handover/casr-gtfs-data-collection-and-access.md)
-for the processing architecture, collection lifecycle, v2 schema, verified
-research examples, API boundaries and Windows operation/recovery references.
-The [Sprint 5 integration report](docs/integration/sprint5-gtfs-integration.md)
-records static coverage and the SCRUM-268 duplicate-key fix merged through PR #69.
+1. Get the code and install dependencies
+Download the latest main branch from this repository (using Code → Download ZIP), extract it, and open PowerShell in the extracted project folder. Alternatively, clone this repository with its actual Git URL.
 
-The October CASR production v2 backup failed integrity validation. Production
-coverage and sustained reliability remain unverified pending a separately
-verified replacement. **v2.1 remains HOLD.** Local tests and the database team's
-separate verification do not remove that release restriction.
-
-## Current Prototype Status
-
-The prototype collects and stores Adelaide Metro GTFS-Realtime data
-and provides a browser interface for exploring recorded transport data.
-
-The current implementation includes:
-
-- Static GTFS parsing and shared data structures.
-- Vehicle Position and Trip Update collection with SQLite persistence.
-- Historical queries by route, stop, vehicle and time range.
-- Storage optimisation for repeated Trip Update observations.
-- Route and stop performance APIs.
-- A delay-hotspot backend endpoint.
-- A Leaflet map with route geometry and stop selection.
-- Nearest-stop lookup using straight-line distance.
-- Historical vehicle playback with time selection and playback controls.
-
-The collector has been deployed on a CASR Windows computer.
-Automatic restart after a power interruption still needs confirmation.
-
-The Sprint 4 demo uses recorded data from 26 September 2026,
-09:00–11:00 Adelaide time, for routes G10, M44 and 506.
-The browser demo is not a live feed.
-
-The hotspot interface has not yet been integrated into the frontend.
-Further verification is needed as the remaining features are completed.
-
-For local data placement, dependency installation, startup commands
-and known issues, follow the
-[Sprint 4 Demo Setup and Risks](docs/integration/sprint4-demo-setup-and-risks.md).
-
-## Project Structure
-
-```text
-backend/
-  analysis/
-  database/
-  parsers/
-  realtime/
-  services/
-  tests/
-
-frontend/
-  components/
-  css/
-  js/
-  map/
-  pages/
-  index.html
-
-shared/
-  constants/
-  schemas/
-  types/
-
-tests/
-  fixtures/
-  test_analysis_integration.py
-  test_database_analysis_integration.py
-
-scripts/
-  validate_fixtures.py
-
-docs/
-  architecture/
-  testing/
-```
-
-## Installation
-
-Python 3.12 is currently used for development.
-
-Install the required Python dependencies from the project root:
-
-```bash
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-```
+python -m pip check
+Tested development environment: Windows, Python 3.12.2. Do not run the application using Python from an unrelated environment.
 
-## Shared GTFS Data
+2. Obtain and place the data
+The following files are supplied separately from the repository:
 
-Shared data structures are defined in:
+Final presentation/
+├── static-map-1710/
+│   ├── catalog.json
+│   ├── calendars.json
+│   └── manifest.json
+├── adelaide_metro_history_v2_20261022_140923.db
+└── official-static-1710.zip
+Required to run the verified CASR v2 website: the complete static-map-1710 folder and the historical .db file.
+For provenance/regenerating the static catalog: official-static-1710.zip (the site does not read this ZIP directly).
+Preserve the original supplied historical database. Use a verified working copy for application access; do not use the original Box backup as the writable Flask database. Do not commit datasets to GitHub.
+For example, copy these files into a separate local folder such as C:\AdelaideMetroData, leaving the original shared copy untouched.
 
-```text
-shared/schemas/
-```
+3. Start the backend
+In the first PowerShell terminal, from the project root, set the paths to your own computer's files:
 
-The current shared entities are:
+.\.venv\Scripts\Activate.ps1
+$env:ADELAIDE_METRO_DATABASE_PATH = "C:\AdelaideMetroData\adelaide_metro_history_v2_20261022_140923.db"
+$env:ADELAIDE_METRO_STATIC_MAP_DATA_PATH = "C:\AdelaideMetroData\static-map-1710"
+python -m flask --app backend.api.app run --host 127.0.0.1 --port 5001
+Keep this terminal running. Check that Flask reports http://127.0.0.1:5001. Do not point this command at a collector's active database or the original immutable backup.
 
-- Stop
-- Route
-- Trip
-- Stop Time
-- Trip Update
-- Vehicle Position
+4. Start the frontend
+Open a second PowerShell terminal in the same project root:
 
-Sample data used during Sprint 1 is stored in:
-
-```text
-tests/fixtures/
-```
-
-## Validate Sample Data
-
-Run:
-
-```bash
-python scripts/validate_fixtures.py
-```
-
-The validation checks the sample datasets against the shared schemas and also checks cross-file GTFS references.
-
-## Backend Tests
-
-
-Run the backend and project test suites from the project root:
-
-```powershell
-python -m pytest backend/tests tests -q
-```
-
-If pytest is not installed in the active Python environment, install it first:
-
-```powershell
-python -m pip install pytest
-```
-
-For the recorded-data integration check, see the
-[Sprint 4 Browser and Backend Verification Report](docs/testing/sprint4-browser-and-backend-verification-20261017.md).
-
-
-Run the original Sprint 1 backend tests using:
-
-```bash
-python -m unittest backend.tests.test_static_gtfs backend.tests.test_realtime_client backend.tests.test_realtime_decoder backend.tests.test_gtfs_converter -v
-```
-
-Sprint 2 realtime processing tests and the database handoff contract are
-documented in [GTFS Processing and Database Handoff](docs/architecture/gtfs-processing.md).
-
-## Continuous Historical Collection
-
-After extracting a current static GTFS feed to a local directory containing
-`stop_times.txt`, start the collector with:
-
-```powershell
-$env:ADELAIDE_METRO_DATABASE_PATH = "$PWD\data\historical\adelaide-metro-history.db"
-python -m backend.services.historical_collection --static-gtfs-dir "$PWD\data\static-gtfs"
-```
-
-The runner reuses the existing scheduled collector and collection-cycle SQLite
-transaction. Full setup, shutdown, restart and hosting guidance is in
-[Continuous Historical GTFS Collection Runner](docs/architecture/historical-collection-runner.md).
-
-For the CASR always-on Windows computer, use the
-[Windows Historical Collector Deployment Guide](docs/deployment/windows-historical-collector.md)
-and `scripts/start_historical_collector.bat`.
-
-Run full backend test discovery with:
-
-```bash
-python -m unittest discover -s backend/tests -p "test_*.py" -v
-```
-
-## Database Test
-
-Run:
-
-```bash
-python -m backend.database.test_repository
-```
-
-The current database test checks basic stop storage, trip update storage, retrieval and duplicate handling.
-
-## Analysis Integration Tests
-
-Run the shared-data analysis test:
-
-```bash
-python -m unittest discover -s tests -p "test_analysis_integration.py" -v
-```
-
-Run the database-to-analysis integration test:
-
-```bash
-python -m unittest discover -s tests -p "test_database_analysis_integration.py" -v
-```
-
-The integration layer converts `delay_seconds` into minutes before passing delay values to the performance analysis functions.
-
-## Frontend
-
-The frontend uses Leaflet and OpenStreetMap and connects to the local
-Flask backend for route, stop, performance and vehicle-history data.
-
-Before starting the application, follow the
-[Sprint 4 Demo Setup and Risks](docs/integration/sprint4-demo-setup-and-risks.md)
-to install dependencies, place the six required local data files
-and configure the backend data paths.
-
-Start the backend using the commands in that guide.
-Keep the backend terminal running.
-
-Open a second terminal in the project root and start the frontend server:
-
-```powershell
 python -m http.server 8000
-```
+Open http://127.0.0.1:8000/frontend/ in a browser.
 
-Open <http://127.0.0.1:8000/frontend/>.
+The repository's frontend/js/map.js currently uses http://127.0.0.1:5001 as its API base URL. Therefore the commands above use port 5001; no frontend-casr-test copy or JavaScript edit is necessary for this configuration. Both terminals must stay open. Internet access is required for online map tiles.
 
-Both servers must remain running while using the application.
-Starting the frontend server alone does not start the backend.
+5. Check that the site is working
+Confirm the city-wide map loads; the tested GTFS Static 1710 catalog contains 384 routes and 7,241 locations.
+Select a route (e.g. G10 or M44) and check that route performance appears.
+Click a blue stop marker to display stop details and performance.
+Open Historical Delay Hotspots or Network-Wide Prediction Delays. Choose a time interval covered by the historical data; not all stops have enough observations.
+For a playback smoke test, select Route 100, 17 October 2026, 09:00–09:30 Adelaide time and load historical vehicle positions. Confirm playback loads and the time progresses. Data coverage may be sparse in some windows.
+If you see Route not found, verify you pulled the latest backend and configured the intended CASR v2 database. If you see no data, first check the historical date/time range and static-vs-historical route coverage.
 
-Leaflet and basemap tiles require internet access or cached resources.
+Automated tests
+From the project root, use a new temporary SQLite database instead of a protected historical backup:
 
+.\.venv\Scripts\Activate.ps1
+$env:ADELAIDE_METRO_DATABASE_PATH = Join-Path $env:TEMP ("adelaide-metro-test-" + [guid]::NewGuid().ToString("N") + ".db")
+python -m pytest -q
+Recorded regression result (7 November 2026): 415 passed in 96.27 seconds. This is evidence from the tested version, not a promise of identical timing in every environment.
 
-## Current Limitations
+Data, safety and limitations
+Static GTFS network coverage and historical observation coverage are different; static routes do not necessarily have historical records.
+Historical delay figures are based on recorded predictions, not necessarily confirmed actual arrivals. A missing value must not be interpreted as zero delay.
+Vehicle playback uses recorded historical positions, not live vehicle tracking; recorded observations may be sparse.
+Map-based nearest-stop distances are straight-line estimates, not walking routes.
+The local website verification does not certify the separately deployed CASR production collector, its automated restart, or long-term reliability. An earlier October production backup was flagged for integrity concerns; the separately obtained and checked CASR v2 file used for final local testing passed its own SQLite integrity check. Do not conflate those claims or change a production release HOLD based only on local tests.
+Browser geolocation requires permission, and large historical queries may hit API limits.
+Final browser verification covered playback loading and timeline progression; Reset and route-switching during playback and individual No Data marker popups were not independently confirmed in the cited QA run.
+Documentation and technical references
+Final Setup and Handover Guide — detailed installation, datasets, fallback demo, data protection and delivery checklist.
+Sprint 5 Final Integration Test Report — actual API, browser and pytest results.
+CASR GTFS Collection and Data Access — collector operation, schema and research-data access.
+CASR v2 Vehicle Playback Integration — playback compatibility fix, API contract and verification.
+City-wide Static Map Preparation — preparation and provenance of static catalog.
+Sprint 5 GTFS Integration — static-data and integration decisions.
+Final Design Documents — module and system design materials.
+Developer reference (existing project capabilities)
+The repository also contains GTFS and GTFS-Realtime collection/parsing modules, optimised trip-update persistence, shared schemas, API services, automated tests and deployment scripts. These are separate from starting the historical-analysis website and may require additional operational configuration.
 
-- The demo uses a fixed recorded dataset rather than a live browser feed.
-- The delay-hotspot endpoint is available, but the hotspot frontend is not yet integrated.
-- Nearest-stop distance is straight-line distance, not road-network distance.
-- Backend performance counts use the latest prediction per trip/stop/scheduled-arrival key in the query result, not unique completed services; the separate reliability CLI aggregates retained rows.
-- Some interface labels and the map/control layout still need improvement.
-- Leaflet and basemap tiles depend on online or cached resources.
-- Browser geolocation depends on browser permissions and operating system settings.
-- Automatic collector restart after a power interruption on the CASR computer has not been confirmed.
-- The October CASR v2 backup failed integrity validation; production coverage and long-term storage growth need a verified replacement and supporting logs.
-- Service Alerts do not yet have a historical persistence contract.
-- Production monitoring and alerting are not yet configured.
+Key directories:
 
-Local verification results and outstanding issues are recorded in the
-[Sprint 4 Browser and Backend Verification Report](docs/testing/sprint4-browser-and-backend-verification-20261017.md).
+backend/                  Flask API, analysis, database and data services
+frontend/                 Leaflet/JavaScript web interface
+shared/                   Shared GTFS entities and schemas
+tests/                    Integration tests and fixtures
+scripts/                  Collection, validation and operational scripts
+docs/                     Architecture, deployment, testing and handover
+For continuous collection or CASR Windows hosting, follow the dedicated collection guide and Windows deployment guide. Do not treat the local browser-demo quick start as instructions for modifying a production collector.
 
-
-## Next Steps
-
-- Integrate the hotspot endpoint into the frontend and test the displayed results.
-- Clarify performance metric labels and recorded-data information.
-- Improve the map and control layout for browser use and screen sharing.
-- Retest reported issues after fixes are merged.
-- Review the remaining features and acceptance criteria with the client.
-- Follow up on the CASR collector restart setup, database backup and storage growth.
-- Keep setup, API and data preparation documentation consistent with the tested version.
-- Prepare the final demonstration and project handover.
-
-
-
-## Historical GTFS-Realtime Collection
-
-The project supports collecting and storing live Adelaide Metro GTFS-Realtime
-data in a historical SQLite database.
-
-The collection runner processes Vehicle Positions and Trip Updates and
-preserves records across multiple collection cycles for later querying and
-analysis.
-
-Trip Updates use the storage-optimised schema: state changes are stored
-immediately, unchanged predictions receive periodic checkpoints, timestamps are
-stored internally as epoch integers, and `actual_arrival` is reconstructed from
-the schedule plus delay. See
-[Historical storage optimisation](docs/architecture/historical-storage-optimisation.md) for controlled replay benchmarks and safe
-deployment guidance.
-
-### Requirements
-
-Download the latest Adelaide Metro static GTFS feed and provide the
-`stop_times.txt` file locally.
-
-Local GTFS data and generated SQLite databases are excluded from Git.
-
-Example local structure:
-
-```text
-data/
-├── static_gtfs/
-│   └── stop_times.txt
-└── history/
-    └── adelaide_metro_history.db
-```
-Run One Collection Cycle
-
-```bash
-py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --cycles 1
-```
-Run Multiple Collection Cycles
-
-```bash
-py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --cycles 3
-```
-Run Continuous Historical Collection
-
-```bash
-py scripts/collect_realtime_history.py --stop-times data/static_gtfs/stop_times.txt --database data/history/adelaide_metro_history.db --continuous
-```
-Use Ctrl+C to stop continuous collection.
-
-Historical Queries
-
-Stored Trip Update records can be queried by:
-
-- route ID
-- stop ID
-- time range
-- combined route, stop and time filters
-
-Stored Vehicle Position records can be queried by:
-
-- vehicle ID
-- route ID
-- time range
-- combined filters
-
-These query interfaces support historical transport analysis and provide a
-foundation for later vehicle playback functionality.
-
-Testing
-
-Sprint 3 database integration is covered by automated repository, persistence,
-pipeline and realtime processing integration tests.
-
-See:
-
-docs/testing/sprint3-database-integration-test-report.md
-
-for the Sprint 3 database integration test results and live data verification.
+The earlier September G10/M44/506 demonstration files remain a separate fallback; see the Final Setup and Handover Guide and the archived Sprint 4 Demo Setup.
