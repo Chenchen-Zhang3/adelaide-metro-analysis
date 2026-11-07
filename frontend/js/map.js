@@ -44,6 +44,7 @@ const stopMarkers = new Map();
 let selectedLocation = null;
 let selectedLocationMarker = null;
 let nearestStopMarker = null;
+let nearestMetricsRequest = 0;
 let selectedStopId = null;
 
 let routeGeometryLayer = null;
@@ -806,6 +807,7 @@ function setSelectedLocation(latitude, longitude, source) {
 
 // Highlight the nearest stop
 function showNearestStop(latitude, longitude) {
+    ++nearestMetricsRequest;
     if (nearestStopMarker) {
         nearestStopMarker.setStyle({
             color: "#3388ff",
@@ -865,7 +867,20 @@ function showNearestStop(latitude, longitude) {
         <p class="detail-message">
             This is straight-line distance, not walking distance.
         </p>
+        <div class="detail-heading">Service frequency and historical reliability</div>
+        <p class="detail-message">Choose an Adelaide-local analysis window (maximum 24 hours). Historical reliability describes prediction observations, not actual arrivals.</p>
+        <label for="nearestMetricsStart">Start (Adelaide)</label>
+        <input id="nearestMetricsStart" type="datetime-local" style="width:100%">
+        <label for="nearestMetricsEnd">End (Adelaide)</label>
+        <input id="nearestMetricsEnd" type="datetime-local" style="width:100%">
+        <button type="button" id="nearestMetricsLoad">Load stop service metrics</button>
+        <p id="nearestMetricsStatus" role="status">Select a historical window to load metrics.</p>
+        <div id="nearestMetricsResults"></div>
     `;
+
+    // Keep the requested stop tied to this nearest-stop result, not the route selector.
+    element("nearestMetricsLoad").addEventListener("click", () => loadNearestMetrics(String(stop.stop_id)));
+
 
     nearestStopMarker = stopMarkers.get(String(stop.stop_id)) || null;
 
@@ -878,6 +893,72 @@ function showNearestStop(latitude, longitude) {
         });
 
         nearestStopMarker.bringToFront();
+    }
+}
+
+// Show stop-level scheduled frequency separately from prediction-observation reliability.
+async function loadNearestMetrics(stopId) {
+    const requestId = ++nearestMetricsRequest;
+    const status = element("nearestMetricsStatus");
+    const output = element("nearestMetricsResults");
+    const start = element("nearestMetricsStart")?.value;
+    const end = element("nearestMetricsEnd")?.value;
+    if (!start || !end || start >= end) {
+        status.textContent = "Choose a valid start and end time.";
+        return;
+    }
+    status.textContent = "Loading stop-level metrics...";
+    output.textContent = "";
+    // Resolve Adelaide local clock times, including the correct daylight-saving offset.
+    // datetime-local does not carry an offset; use Intl to find the matching instant.
+    function adelaideIso(value) {
+        const local = new Date(`${value}:00Z`);
+        if (Number.isNaN(local.getTime())) throw new Error("Invalid analysis time");
+        const wanted = value.replace("T", " ");
+        const formatter = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Australia/Adelaide", year: "numeric", month: "2-digit",
+            day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+        });
+        for (let offset = -14 * 60; offset <= 14 * 60; offset += 30) {
+            const instant = new Date(local.getTime() - offset * 60000);
+            const fields = Object.fromEntries(formatter.formatToParts(instant).map(part => [part.type, part.value]));
+            if (`${fields.year}-${fields.month}-${fields.day} ${fields.hour}:${fields.minute}` === wanted) {
+                const sign = offset >= 0 ? "+" : "-";
+                const abs = Math.abs(offset);
+                return `${value}:00${sign}${String(Math.floor(abs / 60)).padStart(2, "0")}:${String(abs % 60).padStart(2, "0")}`;
+            }
+        }
+        throw new Error("The selected Adelaide time is invalid (possibly a daylight-saving transition).");
+    }
+    try {
+        const params = new URLSearchParams({start_time: adelaideIso(start), end_time: adelaideIso(end)});
+        const response = await fetch(`${API_BASE_URL}/api/stops/${encodeURIComponent(stopId)}/service-metrics?${params}`);
+        const data = await response.json();
+        if (requestId !== nearestMetricsRequest) return;
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        const frequency = data.scheduled_frequency;
+        const reliability = data.historical_prediction_reliability;
+        const frequencyText = frequency.status === "available"
+            ? `${frequency.scheduled_trips_per_hour} scheduled trips/hour (${frequency.scheduled_departures} departures)`
+            : `Unavailable — ${frequency.reason || frequency.status}`;
+        const reliabilityStatusLabels = {
+            insufficient_data: "Insufficient historical data",
+            unavailable: "Historical data unavailable",
+            no_data: "No historical data"
+        };
+        const reliabilityText = reliability.status === "available"
+            ? `${reliability.predicted_on_time_percent}% predicted on-time`
+            : `Unavailable — ${reliability.reason || reliabilityStatusLabels[reliability.status] || "Historical data unavailable"}`;
+        output.innerHTML = `
+            <div class="coordinate-row"><span class="coordinate-label">Scheduled frequency</span><span class="coordinate-value">${escapeHtml(frequencyText)}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Historical prediction reliability</span><span class="coordinate-value">${escapeHtml(reliabilityText)}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Valid prediction observations</span><span class="coordinate-value">${escapeHtml(reliability.observation_count ?? "N/A")}</span></div>
+            <div class="coordinate-row"><span class="coordinate-label">Unique observed trips</span><span class="coordinate-value">${escapeHtml(reliability.unique_observed_trips ?? "N/A")}</span></div>
+            <p class="detail-message">Period: ${escapeHtml(start)} to ${escapeHtml(end)} (Adelaide). Prediction observations are not completed-trip punctuality. Minimum ${escapeHtml(reliability.min_samples ?? 10)} valid observations required.</p>`;
+        status.textContent = "Stop-level metrics loaded.";
+    } catch (error) {
+        if (requestId !== nearestMetricsRequest) return;
+        status.textContent = `Metrics unavailable: ${error.message}`;
     }
 }
 

@@ -86,7 +86,14 @@ def test_http_decode_validation_delay_v2_query_and_api(temporary_db, monkeypatch
     assert response.json["positions"][0]["vehicle_id"] == "001"
 
 
-@pytest.mark.parametrize("failure", [b"not protobuf", HTTPError("http://fixture", 403, "forbidden", {}, None)])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        b"not protobuf",
+        HTTPError("http://fixture", 403, "forbidden", {}, None),
+    ],
+    ids=["invalid-protobuf", "http-403"],
+)
 def test_bad_http_or_decode_never_partially_persists(temporary_db, monkeypatch, failure):
     def fetch(*args, **kwargs):
         if isinstance(failure, Exception):

@@ -14,6 +14,7 @@ from backend.database.repository import (
     get_stop,
 )
 from backend.services import static_map_data
+from backend.services.nearest_stop_metrics import stop_metrics
 from backend.services.stop_delays import query_network_stop_delays
 from backend.database.stop_delays import StopDelayLimitError
 from backend.services.pipeline import query_and_analyse
@@ -111,6 +112,22 @@ def get_routes():
               if static_map_data.configured() else get_all_routes())
 
     return jsonify(routes)
+
+
+@app.get("/api/stops/<stop_id>/service-metrics")
+def get_stop_service_metrics(stop_id):
+    """Return stop-specific timetable frequency and historical prediction metrics."""
+    allowed = {"start_time", "end_time", "min_samples"}
+    if (set(request.args) - allowed or
+            any(len(request.args.getlist(key)) != 1 for key in request.args)):
+        return jsonify({"error": "Unknown or repeated query parameter"}), 400
+    try:
+        start = datetime.fromisoformat(request.args["start_time"])
+        end = datetime.fromisoformat(request.args["end_time"])
+        min_samples = int(request.args.get("min_samples", "10"))
+        return jsonify(stop_metrics(stop_id, start, end, min_samples))
+    except (ValueError, KeyError, OverflowError) as error:
+        return jsonify({"error": str(error)}), 400
 
 
 @app.get("/api/stops/<stop_id>")
