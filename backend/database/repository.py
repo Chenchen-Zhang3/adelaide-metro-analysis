@@ -69,7 +69,9 @@ def _persist_trip_update(cursor, trip_update, checkpoint_seconds):
         record = _normalise_trip_update(trip_update)
     except (TypeError, ValueError) as error:
         raise sqlite3.IntegrityError(str(error)) from error
+    # Identify each prediction by trip, route, and stop.
     key = (record["trip_id"], record["route_id"], record["stop_id"])
+    # Retrieve the previous state to detect meaningful changes.
     previous = cursor.execute(
         """
         SELECT scheduled_arrival, delay_seconds, last_seen_at, last_stored_at
@@ -78,7 +80,8 @@ def _persist_trip_update(cursor, trip_update, checkpoint_seconds):
         """,
         key,
     ).fetchone()
-
+    # Classify new, changed, and checkpoint observations.
+    # Avoid storing repeated unchanged predictions.
     observation_kind = None
     if previous is None:
         observation_kind = OBSERVATION_INITIAL
@@ -130,6 +133,8 @@ def _persist_trip_update(cursor, trip_update, checkpoint_seconds):
         )
         inserted = cursor.rowcount
 
+    # Track when the prediction was last observed.
+    # Keep observation time separate from storage time.
     previous_last_seen = previous["last_seen_at"] if previous else None
     previous_last_stored = previous["last_stored_at"] if previous else None
     last_seen_at = _latest_timestamp(previous_last_seen, record["observed_at"])
@@ -140,6 +145,8 @@ def _persist_trip_update(cursor, trip_update, checkpoint_seconds):
             record["observed_at"],
         )
 
+    # Save the latest prediction state for future comparisons.
+    # Preserve state across collection cycles and restarts.
     cursor.execute(
         """
         INSERT INTO trip_update_current_state (
@@ -590,12 +597,19 @@ def get_trip_updates_filtered(
     start_time=None,
     end_time=None,
 ):
+    """Query historical trip updates using optional filters."""
+
     start_epoch, end_epoch = _trip_update_range(start_time, end_time)
+    # Build safe SQL conditions using supplied filters.
     conditions = []
     parameters = []
+
+    # Filter records by route when provided.
     if route_id is not None:
         conditions.append("route_id = ?")
         parameters.append(route_id)
+
+    # Filter records by stop when provided.
     if stop_id is not None:
         conditions.append("stop_id = ?")
         parameters.append(stop_id)

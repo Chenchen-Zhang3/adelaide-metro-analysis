@@ -41,6 +41,9 @@ def create_sqlite_backup(source_database, destination_database):
 
     with closing(sqlite3.connect(source_uri, uri=True)) as source_connection:
         with closing(sqlite3.connect(destination_database)) as destination_connection:
+
+            # Create a consistent snapshot using SQLite's online backup API.
+            # Keep the original database unchanged.
             source_connection.backup(destination_connection)
             destination_connection.commit()
 
@@ -49,6 +52,8 @@ def create_sqlite_backup(source_database, destination_database):
             "PRAGMA integrity_check"
         ).fetchone()[0]
 
+    # Verify the backup database before accepting it.
+    # Raise an error if the integrity check fails.
     if integrity_result != "ok":
         raise sqlite3.DatabaseError(
             f"Backup integrity check failed: {integrity_result}"
