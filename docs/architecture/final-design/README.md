@@ -1,36 +1,55 @@
-# Final Module Design Documents
 
-This folder contains the final module design documentation for the Adelaide Metro Transport Analysis project.
+# Final System and Module Design Documentation
 
-Each team member is responsible for documenting their own module.
+**Project:** Adelaide Metro Transport Analysis  
+**Client:** Centre for Automotive Safety Research (CASR)  
+**Team:** UG-S2-15  
+**Last Updated:** 8 November 2026
 
-## Assigned Documents
+## Overview
 
-| Team Member | Document |
-|---|---|
-| Chenan Wang | chenan-gtfs-data-collection-design.md |
-| Lixuan Zhang| lixuan-historical-database-design.md |
-| Chengxi Huang| chengxi-delay-analysis-design.md |
-| Pritish Reddy| pritish-frontend-map-design.md |
-| Chenchen Zhang | chenchen-integration-and-qa-design.md |
+This directory contains the final system and module design documentation for the Adelaide Metro Transport Analysis project.
 
-## Documentation Requirements
+The documentation explains how the system was designed to meet CASR's research requirements, the methods and design decisions used by the team, and how the individual modules work together.
 
-Each module design document should include:
+## Integrated System Design
 
-1. Module Purpose and Client Requirements
-2. Main Features and Implemented Functionality
-3. System Architecture and Module Workflow
-4. Key Design Decisions and Reasons
-5. Important Assumptions and Limitations
-6. Testing Methods and Results
-7. Major Bugs, Fixes and Remaining Issues
-8. Third-Party Libraries and External Data Sources
+**[Final System Design](final-system-design.md)**
 
-The documentation should reflect the final implemented system.
+This is the main design document for the complete project.
 
-## Final Integration
+It covers:
+- CASR's research requirements and project objectives.
+- Overall system architecture and technology selection.
+- GTFS data collection and processing.
+- Historical database design.
+- Delay and performance analysis.
+- Interactive frontend and user experience.
+- System integration, testing and design evaluation.
+- Limitations and future improvements.
 
-The team leader will consolidate the module documents into final-system-design.md.
+## Individual Module Designs
 
-Existing Sprint 1-5 architecture documents should be retained as historical project records.
+Each team member prepared documentation for their primary area of responsibility.
+
+| Team Member | Responsibility | Design Document |
+|---|---|---|
+| Chenan Wang | GTFS collection and processing | [GTFS Data Collection Design](chenan-gtfs-data-collection-design.md) |
+| Lixuan | Historical database and queries | [Historical Database Design](lixuan-historical-database-design.md) |
+| Chengxi | Delay and performance analysis | [Delay Analysis Design](chengxi-delay-analysis-design-final.md) |
+| Pritish | Frontend map and visualisation | [Frontend Map Design](pritish-frontend-map-design.md) |
+| Chenchen Zhang | System integration and quality assurance | [Integration and QA Design](chenchen-integration-and-qa-design.md) |
+
+## Related Project Documentation
+
+- [Main Project README](../../../README.md)
+- [CASR Installation and User Guide](../../handover/final-setup-and-handover.md)
+- [Final Integration Test Report](../../testing/sprint5-final-integration-test-report.md)
+
+## Document Structure
+
+The **Final System Design** provides the overall design rationale and explains the integration of the five modules.
+
+The **Individual Module Designs** provide additional details about each component's methods, technical decisions, implementation and verification.
+
+Together, these documents describe the final research platform developed for CASR.
