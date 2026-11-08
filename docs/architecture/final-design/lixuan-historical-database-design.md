@@ -455,4 +455,12 @@ These frontend technologies are maintained by other team members but depend on t
 
 ## Conclusion
 
-My main contribution to the Adelaide Metro Transport Analysis project
+My main contribution to the Adelaide Metro Transport Analysis project was developing and verifying the historical database and query functionality.
+
+Across the project, I worked on database schema development, data insertion, duplicate handling, historical filtering, vehicle position queries, CSV exports, research summaries, verification and handover documentation.
+
+The final prototype demonstrates that historical vehicle records can be retrieved from the database and displayed through an interactive playback interface.
+
+This provides CASR researchers with a foundation for investigating past transport activity and service reliability.
+
+The historical database also supports further research and future system development, provided that dataset coverage, integrity and operational limitations are considered.
